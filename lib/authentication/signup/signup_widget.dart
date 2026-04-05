@@ -415,6 +415,8 @@ class _SignUpWidgetState extends State<SignUpWidget> {
                                                     SignupOtpWidget(
                                                       email: _model.email
                                                           .trim(),
+                                                      fullName: _model.name
+                                                          .trim(),
                                                     ),
                                               ),
                                             );

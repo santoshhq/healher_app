@@ -31,14 +31,12 @@ class LoginApiService {
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email_id': email,
-          'password': password,
-        }),
+        body: jsonEncode({'email_id': email, 'password': password}),
       );
 
       final payload = _safeDecode(response.body);
-      final message = _extractMessage(payload) ?? 'Sign in request completed';
+      final message =
+          _extractMessage(payload) ?? _statusMessage(response.statusCode);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return LoginResponse(
@@ -77,5 +75,18 @@ class LoginApiService {
       return null;
     }
     return message.toString();
+  }
+
+  String _statusMessage(int statusCode) {
+    if (statusCode == 401) {
+      return 'Invalid email or password, or account not verified.';
+    }
+    if (statusCode == 404) {
+      return 'Account not found. Please sign up first.';
+    }
+    if (statusCode >= 500) {
+      return 'Server error. Please try again in a moment.';
+    }
+    return 'Sign in request failed. Please try again.';
   }
 }

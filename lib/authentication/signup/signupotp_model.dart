@@ -10,6 +10,7 @@ class SignupOtpModel {
   String? otpError;
   String? targetEmail;
   String? otpSuccessMessage;
+  String? verifiedUserId;
 
   static const Duration otpValidity = Duration(minutes: 5);
   DateTime? _issuedAt;
@@ -86,6 +87,7 @@ class SignupOtpModel {
     if (response.success) {
       otpError = null;
       otpSuccessMessage = response.message;
+      verifiedUserId = response.userId;
       return true;
     }
 

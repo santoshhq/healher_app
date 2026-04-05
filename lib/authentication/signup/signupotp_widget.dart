@@ -4,13 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_session_service.dart';
 import '../../home/home_widget.dart';
 import 'signupotp_model.dart';
 
 class SignupOtpWidget extends StatefulWidget {
-  const SignupOtpWidget({required this.email, super.key});
+  const SignupOtpWidget({
+    required this.email,
+    required this.fullName,
+    super.key,
+  });
 
   final String email;
+  final String fullName;
 
   @override
   State<SignupOtpWidget> createState() => _SignupOtpWidgetState();
@@ -202,9 +208,20 @@ class _SignupOtpWidgetState extends State<SignupOtpWidget> {
         ),
       );
 
+      await AuthSessionService().saveSession(
+        userId: _model.verifiedUserId ?? '',
+        fullName: widget.fullName,
+        email: widget.email,
+      );
+
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const HomeWidget()),
+        MaterialPageRoute(
+          builder: (context) => HomeWidget(
+            userId: _model.verifiedUserId ?? '',
+            fullName: widget.fullName,
+          ),
+        ),
         (route) => false,
       );
     } else {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_session_service.dart';
 import '../../home/home_widget.dart';
 import 'login_model.dart';
 import '../forget_password/forgetpassword_widget.dart';
@@ -232,11 +233,26 @@ class _LoginWidgetState extends State<LoginWidget> {
                                           }
 
                                           if (loginSuccess) {
+                                            await AuthSessionService()
+                                                .saveSession(
+                                                  userId: _model.userId ?? '',
+                                                  fullName:
+                                                      _model.name ?? 'User',
+                                                  email:
+                                                      _model.emailId ??
+                                                      _model.email,
+                                                );
+
                                             Navigator.pushReplacement(
                                               context,
                                               MaterialPageRoute(
                                                 builder: (context) =>
-                                                    const HomeWidget(),
+                                                    HomeWidget(
+                                                      userId:
+                                                          _model.userId ?? '',
+                                                      fullName:
+                                                          _model.name ?? 'User',
+                                                    ),
                                               ),
                                             );
                                           } else {
