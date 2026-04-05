@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../authentication/services/auth_session_service.dart';
 import '../authentication/login_pages/login_widget.dart';
 import 'cycle_module/cycle_module_widget.dart';
+import 'workouts_plans/workouts_plans_widget.dart';
 
 class HomeWidget extends StatefulWidget {
   const HomeWidget({required this.userId, required this.fullName, super.key});
@@ -100,70 +101,85 @@ class _HomeWidgetState extends State<HomeWidget> {
     required String subtitle,
     required IconData leadingIcon,
     required IconData trailingIcon,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
         borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Container(
-            height: 38,
-            width: 38,
-            decoration: BoxDecoration(
-              color: accent.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(leadingIcon, size: 18, color: const Color(0xFF1D1B20)),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(18),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  category,
-                  style: GoogleFonts.poppins(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF6C6774),
-                    letterSpacing: 0.6,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                height: 38,
+                width: 38,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.2),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1D1B20),
-                  ),
+                child: Icon(
+                  leadingIcon,
+                  size: 18,
+                  color: const Color(0xFF1D1B20),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF6C6774),
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      category,
+                      style: GoogleFonts.poppins(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF6C6774),
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1D1B20),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF6C6774),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Container(
+                height: 30,
+                width: 30,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.75),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  trailingIcon,
+                  size: 16,
+                  color: const Color(0xFF1D1B20),
+                ),
+              ),
+            ],
           ),
-          Container(
-            height: 30,
-            width: 30,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.75),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(trailingIcon, size: 16, color: const Color(0xFF1D1B20)),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -380,10 +396,19 @@ class _HomeWidgetState extends State<HomeWidget> {
                       color: const Color(0xFFD7F2EA),
                       accent: const Color(0xFF41C8A6),
                       category: 'FITNESS',
-                      title: 'Morning Flow Yoga',
-                      subtitle: '15 mins • Light Intensity',
+                      title: 'Generate Workout Plan',
+                      subtitle: 'Warm-up + Main + Relaxation',
                       leadingIcon: Icons.self_improvement,
                       trailingIcon: Icons.play_arrow_rounded,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                WorkoutsPlansWidget(fullName: widget.fullName),
+                          ),
+                        );
+                      },
                     ),
                     _buildRecommendationCard(
                       color: const Color(0xFFFFE7EC),
