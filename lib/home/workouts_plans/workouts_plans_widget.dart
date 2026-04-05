@@ -341,6 +341,30 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
                         ),
                       ),
                     ),
+                  if (_model.saveError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        _model.saveError!,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  if (_model.saveMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        _model.saveMessage!,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: const Color(0xFF2E7D32),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   if (_model.poseStates.isEmpty && !_model.isGenerating)
                     Container(

@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../authentication/services/auth_session_service.dart';
 import 'services/workout_plan_api_service.dart';
 
 class WorkoutPoseState {
   WorkoutPoseState({required this.pose})
-      : remainingSeconds = 300,
-        isRunning = false,
-        isCompleted = false;
+    : remainingSeconds = 300,
+      isRunning = false,
+      isCompleted = false;
 
   final WorkoutPose pose;
   int remainingSeconds;
@@ -17,15 +18,21 @@ class WorkoutPoseState {
 }
 
 class WorkoutsPlansModel extends ChangeNotifier {
-  WorkoutsPlansModel({WorkoutPlanApiService? apiService})
-      : _apiService = apiService ?? WorkoutPlanApiService();
+  WorkoutsPlansModel({
+    WorkoutPlanApiService? apiService,
+    AuthSessionService? authSessionService,
+  }) : _apiService = apiService ?? WorkoutPlanApiService(),
+       _authSessionService = authSessionService ?? AuthSessionService();
 
   final WorkoutPlanApiService _apiService;
+  final AuthSessionService _authSessionService;
   final Map<int, Timer> _timers = {};
 
   bool isGenerating = false;
   String? generateError;
   String? generateMessage;
+  String? saveMessage;
+  String? saveError;
 
   List<WorkoutPoseState> poseStates = [];
 
@@ -39,8 +46,33 @@ class WorkoutsPlansModel extends ChangeNotifier {
     isGenerating = true;
     generateError = null;
     generateMessage = null;
+    saveMessage = null;
+    saveError = null;
     poseStates = [];
     notifyListeners();
+
+    final session = await _authSessionService.getSession();
+    if (session == null || session.userId.trim().isEmpty) {
+      isGenerating = false;
+      generateError = 'User session not found. Please login again.';
+      notifyListeners();
+      return;
+    }
+
+    final todayResponse = await _apiService.getTodayCompletedWorkout(
+      userId: session.userId,
+    );
+
+    if (todayResponse.success && todayResponse.hasCompletedWorkoutToday) {
+      poseStates = todayResponse.poses
+          .map((pose) => WorkoutPoseState(pose: pose)..isCompleted = true)
+          .toList();
+      isGenerating = false;
+      generateMessage = todayResponse.message;
+      saveMessage = 'You already completed today\'s 3 poses.';
+      notifyListeners();
+      return;
+    }
 
     final response = await _apiService.getCustomPoses(
       warmupCount: 1,
@@ -56,6 +88,19 @@ class WorkoutsPlansModel extends ChangeNotifier {
       return;
     }
 
+    if (response.poses.length != 3) {
+      generateError = 'Exactly 3 yoga poses are required';
+      notifyListeners();
+      return;
+    }
+
+    final workoutDate = _formatDate(DateTime.now());
+    final saveResponse = await _apiService.saveCompletedDailyWorkout(
+      userId: session.userId,
+      workoutDate: workoutDate,
+      poses: response.poses,
+    );
+
     poseStates = response.poses
         .map((pose) => WorkoutPoseState(pose: pose))
         .toList();
@@ -64,8 +109,21 @@ class WorkoutsPlansModel extends ChangeNotifier {
       generateError = 'No poses found for the requested plan.';
     } else {
       generateMessage = response.message;
+      saveMessage = saveResponse.success
+          ? (saveResponse.message.isNotEmpty
+                ? saveResponse.message
+                : 'Daily completed poses saved')
+          : null;
+      saveError = saveResponse.success ? null : saveResponse.message;
     }
     notifyListeners();
+  }
+
+  String _formatDate(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
   }
 
   void startTimer(int index) {
