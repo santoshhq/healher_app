@@ -212,6 +212,87 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
     );
   }
 
+  Widget _buildDailyLogHistoryItem({
+    required DailyLogRecord log,
+    bool compact = false,
+  }) {
+    final symptomsText = log.symptoms.isEmpty
+        ? 'None'
+        : log.symptoms.join(', ');
+
+    return Container(
+      margin: EdgeInsets.only(bottom: compact ? 8 : 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF7FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEDE1F2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7B1FA2),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  log.date,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                log.exercise
+                    ? Icons.fitness_center_rounded
+                    : Icons.hotel_rounded,
+                size: 16,
+                color: const Color(0xFF7B1FA2).withOpacity(0.8),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Flow: ${log.flow.toUpperCase()}   Mood: ${log.mood.toUpperCase()}',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: const Color(0xFF4D4556),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Sleep: ${log.sleep} hrs   Water: ${log.water} L   Exercise: ${log.exercise ? 'Yes' : 'No'}',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: const Color(0xFF4D4556),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Symptoms: $symptomsText',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: const Color(0xFF4D4556),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openCycleHistoryDialog() async {
     if (_model.cycles.isEmpty && !_model.isFetchingCycles) {
       await _model.fetchCycles();
@@ -367,6 +448,144 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                         ),
                                       const SizedBox(height: 4),
                                     ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openDailyLogHistoryDialog() async {
+    if (_model.dailyLogs.isEmpty && !_model.isFetchingLogs) {
+      await _model.fetchDailyLogs();
+    }
+    if (!mounted) {
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final maxWidth = MediaQuery.of(dialogContext).size.width * 0.92;
+        final maxHeight = MediaQuery.of(dialogContext).size.height * 0.78;
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 24,
+          ),
+          child: AnimatedBuilder(
+            animation: _model,
+            builder: (context, _) {
+              final sortedLogs = List<DailyLogRecord>.from(_model.dailyLogs)
+                ..sort((a, b) => b.date.compareTo(a.date));
+
+              return Container(
+                width: maxWidth > 420 ? 420 : maxWidth,
+                height: maxHeight > 620 ? 620 : maxHeight,
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEFBFD),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x26000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Daily Logs History',
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF2A2230),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _model.isFetchingLogs
+                              ? null
+                              : _model.fetchDailyLogs,
+                          icon: const Icon(
+                            Icons.refresh_rounded,
+                            color: Color(0xFF7B1FA2),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'All saved daily wellness logs (latest first)',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF7C7385),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Divider(height: 1),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: _model.isFetchingLogs
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.6,
+                              ),
+                            )
+                          : _model.fetchLogsError != null
+                          ? Center(
+                              child: Text(
+                                _model.fetchLogsError!,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.red.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          : sortedLogs.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No daily logs available yet.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: const Color(0xFF7A7383),
+                                ),
+                              ),
+                            )
+                          : Scrollbar(
+                              thumbVisibility: true,
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    for (final log in sortedLogs)
+                                      _buildDailyLogHistoryItem(
+                                        log: log,
+                                        compact: true,
+                                      ),
                                   ],
                                 ),
                               ),
@@ -1056,6 +1275,71 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                         const SizedBox(height: 2),
                                         Text(
                                           'Tap to open fixed-size monthly timeline',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 11,
+                                            color: const Color(0xFF7A7383),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 16,
+                                    color: Color(0xFF8B8295),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: _openDailyLogHistoryDialog,
+                            child: Ink(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8F1FC),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFE8D9F1),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    height: 38,
+                                    width: 38,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFE1F7),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.fact_check_rounded,
+                                      color: Color(0xFF7B1FA2),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Daily Logs History',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF2A2230),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Tap to view all saved daily logs',
                                           style: GoogleFonts.poppins(
                                             fontSize: 11,
                                             color: const Color(0xFF7A7383),

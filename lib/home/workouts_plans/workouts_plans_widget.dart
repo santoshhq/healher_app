@@ -34,6 +34,7 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
   void initState() {
     super.initState();
     _model = WorkoutsPlansModel();
+    _model.loadTodayCompletedWorkout();
   }
 
   @override
@@ -285,10 +286,13 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _model.isGenerating
+                      onPressed:
+                          _model.isGenerating ||
+                              _model.isLoadingToday ||
+                              _model.isGenerateLocked
                           ? null
                           : _model.generateWorkoutPlan,
-                      icon: _model.isGenerating
+                      icon: (_model.isGenerating || _model.isLoadingToday)
                           ? const SizedBox(
                               height: 16,
                               width: 16,
@@ -297,10 +301,18 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.auto_awesome_rounded),
+                          : Icon(
+                              _model.isGenerateLocked
+                                  ? Icons.lock_clock_rounded
+                                  : Icons.auto_awesome_rounded,
+                            ),
                       label: Text(
-                        _model.isGenerating
+                        _model.isLoadingToday
+                            ? 'Loading today\'s plan...'
+                            : _model.isGenerating
                             ? 'Generating...'
+                            : _model.isGenerateLocked
+                            ? 'Today Workout Done '
                             : 'Generate Workout Plan',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w700,
@@ -341,6 +353,18 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
                         ),
                       ),
                     ),
+                  if (_model.generateLockMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        _model.generateLockMessage!,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: const Color(0xFF6F6978),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   if (_model.saveError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
@@ -366,7 +390,9 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
                       ),
                     ),
                   const SizedBox(height: 12),
-                  if (_model.poseStates.isEmpty && !_model.isGenerating)
+                  if (_model.poseStates.isEmpty &&
+                      !_model.isGenerating &&
+                      !_model.isLoadingToday)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
@@ -375,7 +401,7 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
-                        'No plan generated yet. Tap "Generate Workout Plan" to fetch warm-up, main and relaxation poses.',
+                        'No completed workout found for today. Tap "Generate Workout Plan" to create today\'s 3 poses. Tomorrow starts fresh at zero until you generate again.',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           color: const Color(0xFF6F6978),

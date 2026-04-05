@@ -242,6 +242,7 @@ class WorkoutPlanApiService {
 
   Future<TodayCompletedWorkoutResponse> getTodayCompletedWorkout({
     required String userId,
+    required String workoutDate,
   }) async {
     if (userId.trim().isEmpty) {
       return const TodayCompletedWorkoutResponse(
@@ -254,39 +255,72 @@ class WorkoutPlanApiService {
       );
     }
 
-    final uri = Uri.parse('$_baseUrl/daily-workout/today/$userId');
+    if (workoutDate.trim().isEmpty) {
+      return const TodayCompletedWorkoutResponse(
+        success: false,
+        message: 'Workout date is required in YYYY-MM-DD format.',
+        userId: '',
+        workoutDate: '',
+        poses: [],
+        completedCount: 0,
+      );
+    }
+
+    final uri = Uri.parse('$_baseUrl/daily-workout/$userId/$workoutDate');
 
     try {
       final response = await http.get(uri).timeout(const Duration(seconds: 20));
       final payload = _safeDecode(response.body);
-      final message =
-          _extractMessage(payload) ?? 'Unable to fetch today workout';
+      final workouts = _parseWorkouts(payload['workouts']);
+      final hasData = workouts.isNotEmpty;
+      final selected = hasData ? workouts.first : null;
 
-      final poses = _parsePoses(payload['poses']);
-      final completedCount =
-          int.tryParse(payload['completedCount']?.toString() ?? '') ??
-          poses.length;
+      final poses = selected?.poses ?? const <WorkoutPose>[];
+      final completedCount = selected?.completedCount ?? 0;
+      final status = selected?.status;
+
+      final message =
+          _extractMessage(payload) ??
+          (hasData
+              ? 'Daily completed workout fetched successfully'
+              : 'No completed workout found for this date');
 
       final success = response.statusCode >= 200 && response.statusCode < 300;
       return TodayCompletedWorkoutResponse(
         success: success,
         message: message,
         userId: payload['userId']?.toString() ?? userId,
-        workoutDate: payload['workoutDate']?.toString() ?? '',
+        workoutDate: payload['workoutDate']?.toString() ?? workoutDate,
         poses: poses,
         completedCount: completedCount,
-        status: payload['status']?.toString(),
+        status: status,
       );
     } catch (_) {
       return TodayCompletedWorkoutResponse(
         success: false,
-        message: 'Unable to fetch today completed workout. Please try again.',
+        message: 'Unable to fetch completed workout. Please try again.',
         userId: userId,
-        workoutDate: '',
+        workoutDate: workoutDate,
         poses: const [],
         completedCount: 0,
       );
     }
+  }
+
+  List<_DailyWorkoutRecord> _parseWorkouts(dynamic workoutsJson) {
+    final workouts = <_DailyWorkoutRecord>[];
+    if (workoutsJson is List) {
+      for (final item in workoutsJson) {
+        if (item is Map<String, dynamic>) {
+          workouts.add(_DailyWorkoutRecord.fromJson(item));
+        } else if (item is Map) {
+          workouts.add(
+            _DailyWorkoutRecord.fromJson(Map<String, dynamic>.from(item)),
+          );
+        }
+      }
+    }
+    return workouts;
   }
 
   List<WorkoutPose> _parsePoses(dynamic posesJson) {
@@ -321,5 +355,39 @@ class WorkoutPlanApiService {
       return null;
     }
     return message.toString();
+  }
+}
+
+class _DailyWorkoutRecord {
+  const _DailyWorkoutRecord({
+    required this.poses,
+    required this.completedCount,
+    this.status,
+  });
+
+  final List<WorkoutPose> poses;
+  final int completedCount;
+  final String? status;
+
+  factory _DailyWorkoutRecord.fromJson(Map<String, dynamic> json) {
+    final poses = <WorkoutPose>[];
+    final posesJson = json['poses'];
+    if (posesJson is List) {
+      for (final item in posesJson) {
+        if (item is Map<String, dynamic>) {
+          poses.add(WorkoutPose.fromJson(item));
+        } else if (item is Map) {
+          poses.add(WorkoutPose.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+
+    return _DailyWorkoutRecord(
+      poses: poses,
+      completedCount:
+          int.tryParse(json['completedCount']?.toString() ?? '') ??
+          poses.length,
+      status: json['status']?.toString(),
+    );
   }
 }

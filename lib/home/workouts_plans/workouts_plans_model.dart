@@ -27,10 +27,14 @@ class WorkoutsPlansModel extends ChangeNotifier {
   final WorkoutPlanApiService _apiService;
   final AuthSessionService _authSessionService;
   final Map<int, Timer> _timers = {};
+  Timer? _generateUnlockTimer;
 
   bool isGenerating = false;
+  bool isLoadingToday = false;
+  bool isGenerateLocked = false;
   String? generateError;
   String? generateMessage;
+  String? generateLockMessage;
   String? saveMessage;
   String? saveError;
 
@@ -41,7 +45,72 @@ class WorkoutsPlansModel extends ChangeNotifier {
   int get completedCount =>
       poseStates.where((state) => state.isCompleted).length;
 
+  Future<void> loadTodayCompletedWorkout() async {
+    _cancelAllTimers();
+    isLoadingToday = true;
+    generateError = null;
+    generateMessage = null;
+    saveMessage = null;
+    saveError = null;
+    poseStates = [];
+    notifyListeners();
+
+    final session = await _authSessionService.getSession();
+    if (session == null || session.userId.trim().isEmpty) {
+      isLoadingToday = false;
+      generateError = 'User session not found. Please login again.';
+      notifyListeners();
+      return;
+    }
+
+    final workoutDate = _currentIstDate();
+    final todayResponse = await _apiService.getTodayCompletedWorkout(
+      userId: session.userId,
+      workoutDate: workoutDate,
+    );
+
+    isLoadingToday = false;
+
+    if (!todayResponse.success) {
+      _setGenerateLockForWorkoutDate(
+        workoutDate: workoutDate,
+        hasWorkout: false,
+      );
+      generateError = todayResponse.message;
+      notifyListeners();
+      return;
+    }
+
+    poseStates = todayResponse.poses
+        .map(
+          (pose) => WorkoutPoseState(pose: pose)
+            ..isCompleted =
+                pose.completed ||
+                todayResponse.status?.toLowerCase() == 'completed',
+        )
+        .toList();
+
+    _setGenerateLockForWorkoutDate(
+      workoutDate: workoutDate,
+      hasWorkout:
+          todayResponse.poses.isNotEmpty || todayResponse.completedCount > 0,
+    );
+
+    generateMessage = todayResponse.poses.isEmpty
+        ? 'No completed workout found for today.'
+        : todayResponse.message;
+    notifyListeners();
+  }
+
   Future<void> generateWorkoutPlan() async {
+    if (isGenerateLocked) {
+      generateError =
+          generateLockMessage ??
+          'Generate Workout Plan will unlock at 1:00 AM IST.';
+      notifyListeners();
+      return;
+    }
+
     _cancelAllTimers();
     isGenerating = true;
     generateError = null;
@@ -59,14 +128,21 @@ class WorkoutsPlansModel extends ChangeNotifier {
       return;
     }
 
+    final workoutDate = _currentIstDate();
+
     final todayResponse = await _apiService.getTodayCompletedWorkout(
       userId: session.userId,
+      workoutDate: workoutDate,
     );
 
     if (todayResponse.success && todayResponse.hasCompletedWorkoutToday) {
       poseStates = todayResponse.poses
           .map((pose) => WorkoutPoseState(pose: pose)..isCompleted = true)
           .toList();
+      _setGenerateLockForWorkoutDate(
+        workoutDate: workoutDate,
+        hasWorkout: true,
+      );
       isGenerating = false;
       generateMessage = todayResponse.message;
       saveMessage = 'You already completed today\'s 3 poses.';
@@ -94,7 +170,6 @@ class WorkoutsPlansModel extends ChangeNotifier {
       return;
     }
 
-    final workoutDate = _formatDate(DateTime.now());
     final saveResponse = await _apiService.saveCompletedDailyWorkout(
       userId: session.userId,
       workoutDate: workoutDate,
@@ -108,6 +183,10 @@ class WorkoutsPlansModel extends ChangeNotifier {
     if (poseStates.isEmpty) {
       generateError = 'No poses found for the requested plan.';
     } else {
+      _setGenerateLockForWorkoutDate(
+        workoutDate: workoutDate,
+        hasWorkout: saveResponse.success,
+      );
       generateMessage = response.message;
       saveMessage = saveResponse.success
           ? (saveResponse.message.isNotEmpty
@@ -117,6 +196,64 @@ class WorkoutsPlansModel extends ChangeNotifier {
       saveError = saveResponse.success ? null : saveResponse.message;
     }
     notifyListeners();
+  }
+
+  String _currentIstDate() => _formatDate(_nowIst());
+
+  DateTime _nowIst() {
+    return DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+  }
+
+  void _setGenerateLockForWorkoutDate({
+    required String workoutDate,
+    required bool hasWorkout,
+  }) {
+    _generateUnlockTimer?.cancel();
+
+    if (!hasWorkout) {
+      isGenerateLocked = false;
+      generateLockMessage = null;
+      return;
+    }
+
+    final dateParts = workoutDate.split('-');
+    if (dateParts.length != 3) {
+      isGenerateLocked = true;
+      generateLockMessage =
+          'Generate Workout Plan is locked for today and unlocks at 1:00 AM IST.';
+      return;
+    }
+
+    final year = int.tryParse(dateParts[0]);
+    final month = int.tryParse(dateParts[1]);
+    final day = int.tryParse(dateParts[2]);
+    if (year == null || month == null || day == null) {
+      isGenerateLocked = true;
+      generateLockMessage =
+          'Generate Workout Plan is locked for today and unlocks at 1:00 AM IST.';
+      return;
+    }
+
+    final unlockAtIst = DateTime(year, month, day + 1, 1);
+    final nowIst = _nowIst();
+
+    if (!nowIst.isBefore(unlockAtIst)) {
+      isGenerateLocked = false;
+      generateLockMessage = null;
+      return;
+    }
+
+    isGenerateLocked = true;
+    generateLockMessage =
+        'Generate Workout Plan is locked. It will unlock at 1:00 AM IST.';
+
+    final waitDuration = unlockAtIst.difference(nowIst);
+    _generateUnlockTimer = Timer(waitDuration, () {
+      isGenerateLocked = false;
+      generateLockMessage = null;
+      loadTodayCompletedWorkout();
+      notifyListeners();
+    });
   }
 
   String _formatDate(DateTime date) {
@@ -237,6 +374,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
   @override
   void dispose() {
     _cancelAllTimers();
+    _generateUnlockTimer?.cancel();
     super.dispose();
   }
 }

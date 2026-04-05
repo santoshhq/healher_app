@@ -66,6 +66,76 @@ class CycleListResponse {
   final List<CycleRecord> cycles;
 }
 
+class DailyLogRecord {
+  const DailyLogRecord({
+    required this.id,
+    required this.userId,
+    required this.date,
+    required this.flow,
+    required this.symptoms,
+    required this.mood,
+    required this.sleep,
+    required this.water,
+    required this.exercise,
+    this.createdAt,
+  });
+
+  final String id;
+  final String userId;
+  final String date;
+  final String flow;
+  final List<String> symptoms;
+  final String mood;
+  final double sleep;
+  final double water;
+  final bool exercise;
+  final DateTime? createdAt;
+
+  factory DailyLogRecord.fromJson(Map<String, dynamic> json) {
+    final symptoms = <String>[];
+    final rawSymptoms = json['symptoms'];
+    if (rawSymptoms is List) {
+      for (final item in rawSymptoms) {
+        if (item != null) {
+          final value = item.toString().trim();
+          if (value.isNotEmpty) {
+            symptoms.add(value);
+          }
+        }
+      }
+    }
+
+    return DailyLogRecord(
+      id: json['_id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      date: json['date']?.toString() ?? '',
+      flow: json['flow']?.toString() ?? 'medium',
+      symptoms: symptoms,
+      mood: json['mood']?.toString() ?? 'normal',
+      sleep: double.tryParse(json['sleep']?.toString() ?? '0') ?? 0,
+      water: double.tryParse(json['water']?.toString() ?? '0') ?? 0,
+      exercise: json['exercise'] == true,
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
+    );
+  }
+}
+
+class DailyLogListResponse {
+  const DailyLogListResponse({
+    required this.success,
+    required this.message,
+    required this.userId,
+    required this.count,
+    required this.logs,
+  });
+
+  final bool success;
+  final String message;
+  final String userId;
+  final int count;
+  final List<DailyLogRecord> logs;
+}
+
 class CycleApiService {
   static const String _baseUrl = 'http://13.222.13.211:8080';
 
@@ -158,7 +228,8 @@ class CycleApiService {
     try {
       final response = await http.get(uri);
       final payload = _safeDecode(response.body);
-      final message = _extractMessage(payload) ?? 'Cycle list request completed';
+      final message =
+          _extractMessage(payload) ?? 'Cycle list request completed';
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final cyclesJson = payload['cycles'];
@@ -174,15 +245,89 @@ class CycleApiService {
           }
         }
 
-        return CycleListResponse(success: true, message: message, cycles: cycles);
+        return CycleListResponse(
+          success: true,
+          message: message,
+          cycles: cycles,
+        );
       }
 
-      return CycleListResponse(success: false, message: message, cycles: const []);
+      return CycleListResponse(
+        success: false,
+        message: message,
+        cycles: const [],
+      );
     } catch (_) {
       return const CycleListResponse(
         success: false,
         message: 'Unable to connect. Please check internet and try again.',
         cycles: [],
+      );
+    }
+  }
+
+  Future<DailyLogListResponse> getDailyLogsByUserId(String userId) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) {
+      return const DailyLogListResponse(
+        success: false,
+        message: 'User ID is required to fetch daily logs',
+        userId: '',
+        count: 0,
+        logs: [],
+      );
+    }
+
+    final uri = Uri.parse('$_baseUrl/logs-daily/$cleanUserId');
+
+    try {
+      final response = await http.get(uri);
+      final payload = _safeDecode(response.body);
+      final message =
+          _extractMessage(payload) ?? 'Daily logs request completed';
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final logsJson = payload['logs'];
+        final logs = <DailyLogRecord>[];
+
+        if (logsJson is List) {
+          for (final item in logsJson) {
+            if (item is Map<String, dynamic>) {
+              logs.add(DailyLogRecord.fromJson(item));
+            } else if (item is Map) {
+              logs.add(
+                DailyLogRecord.fromJson(Map<String, dynamic>.from(item)),
+              );
+            }
+          }
+        }
+
+        final count =
+            int.tryParse(payload['count']?.toString() ?? '') ?? logs.length;
+
+        return DailyLogListResponse(
+          success: true,
+          message: message,
+          userId: payload['userId']?.toString() ?? cleanUserId,
+          count: count,
+          logs: logs,
+        );
+      }
+
+      return DailyLogListResponse(
+        success: false,
+        message: message,
+        userId: cleanUserId,
+        count: 0,
+        logs: const [],
+      );
+    } catch (_) {
+      return DailyLogListResponse(
+        success: false,
+        message: 'Unable to connect. Please check internet and try again.',
+        userId: cleanUserId,
+        count: 0,
+        logs: const [],
       );
     }
   }

@@ -4,7 +4,7 @@ import 'services/cycle_api_service.dart';
 
 class CycleModuleModel extends ChangeNotifier {
   CycleModuleModel({required String userId, CycleApiService? apiService})
-      : _apiService = apiService ?? CycleApiService() {
+    : _apiService = apiService ?? CycleApiService() {
     userIdController.text = userId;
   }
 
@@ -18,8 +18,12 @@ class CycleModuleModel extends ChangeNotifier {
     text: '5',
   );
   final TextEditingController symptomsController = TextEditingController();
-  final TextEditingController sleepController = TextEditingController(text: '7.5');
-  final TextEditingController waterController = TextEditingController(text: '2.5');
+  final TextEditingController sleepController = TextEditingController(
+    text: '7.5',
+  );
+  final TextEditingController waterController = TextEditingController(
+    text: '2.5',
+  );
 
   DateTime cycleStartDate = DateTime.now();
   DateTime? cycleEndDate;
@@ -32,14 +36,17 @@ class CycleModuleModel extends ChangeNotifier {
   bool isSubmittingCycle = false;
   bool isSubmittingLog = false;
   bool isFetchingCycles = false;
+  bool isFetchingLogs = false;
 
   String? addCycleMessage;
   String? addCycleError;
   String? addLogMessage;
   String? addLogError;
   String? fetchCyclesError;
+  String? fetchLogsError;
 
   List<CycleRecord> cycles = [];
+  List<DailyLogRecord> dailyLogs = [];
 
   void setCycleStartDate(DateTime value) {
     cycleStartDate = value;
@@ -172,6 +179,7 @@ class CycleModuleModel extends ChangeNotifier {
     if (response.success) {
       addLogMessage = response.message;
       addLogError = null;
+      await fetchDailyLogs();
       notifyListeners();
       return true;
     }
@@ -206,6 +214,33 @@ class CycleModuleModel extends ChangeNotifier {
     }
 
     fetchCyclesError = response.message;
+    notifyListeners();
+  }
+
+  Future<void> fetchDailyLogs() async {
+    final userId = userIdController.text.trim();
+    if (userId.isEmpty) {
+      fetchLogsError = 'User ID is required to fetch daily logs';
+      notifyListeners();
+      return;
+    }
+
+    isFetchingLogs = true;
+    fetchLogsError = null;
+    notifyListeners();
+
+    final response = await _apiService.getDailyLogsByUserId(userId);
+
+    isFetchingLogs = false;
+
+    if (response.success) {
+      dailyLogs = response.logs;
+      fetchLogsError = null;
+      notifyListeners();
+      return;
+    }
+
+    fetchLogsError = response.message;
     notifyListeners();
   }
 
