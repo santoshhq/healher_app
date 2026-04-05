@@ -1,0 +1,250 @@
+import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+
+class FoodAnalysisResult {
+  const FoodAnalysisResult({
+    required this.foodName,
+    required this.calories,
+    required this.healthScore,
+    required this.protein,
+    required this.carbs,
+    required this.fats,
+    required this.pcosPositive,
+    required this.pcosNegative,
+    required this.recommendation,
+    required this.alternative,
+  });
+
+  final String foodName;
+  final String calories;
+  final String healthScore;
+  final String protein;
+  final String carbs;
+  final String fats;
+  final String pcosPositive;
+  final String pcosNegative;
+  final String recommendation;
+  final String alternative;
+
+  factory FoodAnalysisResult.fromJson(Map<String, dynamic> json) {
+    final macros = _toMap(json['macros']);
+    final pcosImpact = _toMap(json['pcos_impact']);
+
+    return FoodAnalysisResult(
+      foodName: json['food_name']?.toString() ?? 'Unknown food',
+      calories: json['calories']?.toString() ?? '-',
+      healthScore: json['health_score']?.toString() ?? '-',
+      protein: macros['protein']?.toString() ?? '-',
+      carbs: macros['carbs']?.toString() ?? '-',
+      fats: macros['fats']?.toString() ?? '-',
+      pcosPositive: pcosImpact['positive']?.toString() ?? '-',
+      pcosNegative: pcosImpact['negative']?.toString() ?? '-',
+      recommendation: json['recommendation']?.toString() ?? '-',
+      alternative: json['alternative']?.toString() ?? '-',
+    );
+  }
+
+  static Map<String, dynamic> _toMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return {};
+  }
+}
+
+class FoodAnalysisResponse {
+  const FoodAnalysisResponse({
+    required this.success,
+    required this.message,
+    required this.rawPayload,
+    this.result,
+  });
+
+  final bool success;
+  final String message;
+  final Map<String, dynamic> rawPayload;
+  final FoodAnalysisResult? result;
+}
+
+class FoodScannerApiService {
+  static const String _baseUrl = 'http://13.222.13.211:8080';
+  static const String _analysePath = '/food-analyse';
+  static const Duration _requestTimeout = Duration(seconds: 90);
+
+  Future<FoodAnalysisResponse> analyseFood({
+    required String imageBase64OrDataUri,
+  }) async {
+    final imageData = imageBase64OrDataUri.trim();
+    if (imageData.isEmpty) {
+      return const FoodAnalysisResponse(
+        success: false,
+        message: 'Please select an image before analysis.',
+        rawPayload: {},
+      );
+    }
+
+    final uri = Uri.parse('$_baseUrl$_analysePath');
+
+    try {
+      final response = await _postAnalyse(uri: uri, imageData: imageData);
+
+      final payload = _safeDecode(response.body);
+      final analysisPayload = _extractAnalysisPayload(payload);
+      final contractError = _extractContractError(payload);
+
+      if (contractError != null) {
+        return FoodAnalysisResponse(
+          success: false,
+          message: contractError,
+          rawPayload: payload,
+        );
+      }
+
+      final success = response.statusCode >= 200 && response.statusCode < 300;
+      if (!success) {
+        final message =
+            _extractMessage(payload) ??
+            'Food analysis failed with status ${response.statusCode}. Please try with another image.';
+        return FoodAnalysisResponse(
+          success: false,
+          message: message,
+          rawPayload: payload,
+        );
+      }
+
+      return FoodAnalysisResponse(
+        success: true,
+        message: 'Food analysis completed successfully.',
+        rawPayload: analysisPayload,
+        result: FoodAnalysisResult.fromJson(analysisPayload),
+      );
+    } on TimeoutException {
+      return const FoodAnalysisResponse(
+        success: false,
+        message:
+            'Food analysis request timed out while waiting for the AI provider. Please retry in a moment. If this continues, the upstream model may be timing out (504).',
+        rawPayload: {},
+      );
+    } on SocketException {
+      return const FoodAnalysisResponse(
+        success: false,
+        message:
+            'Network error while reaching food analysis server. Check internet and try again.',
+        rawPayload: {},
+      );
+    } on HttpException {
+      return const FoodAnalysisResponse(
+        success: false,
+        message:
+            'Server connection failed for food analysis. Please try again in a moment.',
+        rawPayload: {},
+      );
+    } catch (error) {
+      return FoodAnalysisResponse(
+        success: false,
+        message: 'Unable to analyse image right now: ${error.toString()}',
+        rawPayload: {},
+      );
+    }
+  }
+
+  Future<http.Response> _postAnalyse({
+    required Uri uri,
+    required String imageData,
+  }) async {
+    TimeoutException? lastTimeout;
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await http
+            .post(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: jsonEncode({'image_data': imageData}),
+            )
+            .timeout(_requestTimeout);
+      } on TimeoutException catch (error) {
+        lastTimeout = error;
+      }
+    }
+
+    throw lastTimeout ?? TimeoutException('Food analysis request timed out');
+  }
+
+  Map<String, dynamic> _safeDecode(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      return {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  String? _extractMessage(Map<String, dynamic> payload) {
+    final message = payload['message'] ?? payload['detail'] ?? payload['error'];
+    if (message == null) {
+      return null;
+    }
+    return message.toString();
+  }
+
+  String? _extractContractError(Map<String, dynamic> payload) {
+    final errorText = payload['error']?.toString().trim();
+    if (errorText == null || errorText.isEmpty) {
+      return null;
+    }
+
+    if (_isUpstreamTimeoutError(errorText)) {
+      return 'AI provider timeout (504). Your backend is reachable, but upstream analysis timed out. Please retry in a moment.';
+    }
+
+    final hint = payload['hint']?.toString().trim();
+    final raw = payload['raw']?.toString().trim();
+    final parts = <String>[errorText];
+
+    if (hint != null && hint.isNotEmpty) {
+      parts.add('Hint: $hint');
+    }
+
+    if (raw != null && raw.isNotEmpty) {
+      const maxLength = 220;
+      final shortened = raw.length > maxLength
+          ? '${raw.substring(0, maxLength)}...'
+          : raw;
+      parts.add('Raw: $shortened');
+    }
+
+    return parts.join('\n');
+  }
+
+  bool _isUpstreamTimeoutError(String text) {
+    final normalized = text.toLowerCase();
+    return normalized.contains('504') ||
+        normalized.contains('gateway timeout') ||
+        normalized.contains('timed out');
+  }
+
+  Map<String, dynamic> _extractAnalysisPayload(Map<String, dynamic> payload) {
+    // Accept direct payloads and common wrapped response shapes.
+    final wrapped = payload['data'] ?? payload['result'];
+    if (wrapped is Map<String, dynamic>) {
+      return wrapped;
+    }
+    if (wrapped is Map) {
+      return Map<String, dynamic>.from(wrapped);
+    }
+    return payload;
+  }
+}

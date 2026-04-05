@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../authentication/services/auth_session_service.dart';
 import '../authentication/login_pages/login_widget.dart';
 import 'cycle_module/cycle_module_widget.dart';
+import 'foodscanner/foodscanner-widget.dart';
 import 'workouts_plans/workouts_plans_widget.dart';
 
 class HomeWidget extends StatefulWidget {
@@ -414,10 +415,18 @@ class _HomeWidgetState extends State<HomeWidget> {
                       color: const Color(0xFFFFE7EC),
                       accent: const Color(0xFFF7A8B8),
                       category: 'NUTRITION',
-                      title: 'Quinoa Salad',
-                      subtitle: 'PCOS-friendly • High Protein',
+                      title: 'Food Scanner',
+                      subtitle: 'Scan your meal for instant nutrition analysis',
                       leadingIcon: Icons.restaurant_menu,
                       trailingIcon: Icons.arrow_forward_rounded,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FoodScannerWidget(),
+                          ),
+                        );
+                      },
                     ),
                     Container(
                       height: 120,
@@ -526,6 +535,14 @@ class _HomeWidgetState extends State<HomeWidget> {
                     index: 3,
                     icon: Icons.document_scanner_outlined,
                     label: 'Scanner',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const FoodScannerWidget(),
+                        ),
+                      );
+                    },
                   ),
                   _buildBottomNavItem(
                     index: 4,
