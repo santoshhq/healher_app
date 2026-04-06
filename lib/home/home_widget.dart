@@ -7,7 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../authentication/login_pages/login_widget.dart';
 import '../authentication/services/auth_session_service.dart';
 import 'chatbot/chatbot_widget.dart';
+import 'cycle_module/cycle_module_model.dart';
 import 'cycle_module/cycle_module_widget.dart';
+import 'cycle_module/services/cycle_api_service.dart';
 import 'nutrition_tab/nutrition_tab_widget.dart';
 import 'symtoms_predictor/predictor_widget.dart';
 import 'workouts_plans/workouts_plans_widget.dart';
@@ -30,6 +32,89 @@ class _HomeWidgetState extends State<HomeWidget> {
   final Color accentPink = const Color(0xFFD24787);
   final Color textPrimary = const Color(0xFF221A26);
   final Color textSecondary = const Color(0xFF8B7F8F);
+
+  late CycleModuleModel _cycleModel;
+
+  int _daysUntilOvulation = 7;
+  double _cycleProgress = 0.72;
+  String _currentPhase = 'Follicular Phase';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cycleModel = CycleModuleModel(userId: widget.userId);
+    _initializeCycleData();
+  }
+
+  Future<void> _initializeCycleData() async {
+    try {
+      await _cycleModel.fetchCycles();
+      if (mounted) {
+        _updateCycleInfo();
+      }
+    } catch (e) {
+      // Cycle data not available, use defaults
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _updateCycleInfo() {
+    if (_cycleModel.cycles.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    final now = _normalize(DateTime.now());
+    final latest = _cycleModel.cycles.last;
+
+    // Get ovulation date
+    final ovulationDate = latest.ovulationDate != null
+        ? _normalize(latest.ovulationDate!)
+        : _normalize(
+            latest.startDate.add(
+              Duration(days: (latest.cycleLength - 14).clamp(8, 25)),
+            ),
+          );
+
+    // Calculate days until ovulation
+    final daysUntil = ovulationDate.difference(now).inDays;
+    _daysUntilOvulation = daysUntil.clamp(0, 99);
+
+    // Calculate cycle progress
+    final cycleStart = _normalize(latest.startDate);
+    final daysSinceStart = now.difference(cycleStart).inDays;
+    _cycleProgress = (daysSinceStart / latest.cycleLength).clamp(0.0, 1.0);
+
+    // Determine current phase
+    final periodEnd = cycleStart.add(Duration(days: latest.periodLength - 1));
+    final ovulationWindowStart = ovulationDate.subtract(
+      const Duration(days: 4),
+    );
+    final ovulationWindowEnd = ovulationDate.add(const Duration(days: 1));
+
+    if (now.isBefore(periodEnd) || now.isAtSameMomentAs(periodEnd)) {
+      _currentPhase = 'Period Phase';
+    } else if (now.isBefore(ovulationWindowStart)) {
+      _currentPhase = 'Follicular Phase';
+    } else if (!now.isAfter(ovulationWindowEnd)) {
+      _currentPhase = 'Ovulation';
+    } else {
+      _currentPhase = 'Luteal Phase';
+    }
+
+    setState(() => _isLoading = false);
+  }
+
+  DateTime _normalize(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  @override
+  void dispose() {
+    _cycleModel.dispose();
+    super.dispose();
+  }
 
   Future<void> _logout() async {
     await AuthSessionService().clearSession();
@@ -180,45 +265,53 @@ class _HomeWidgetState extends State<HomeWidget> {
     return Row(
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: 46,
+          height: 46,
           decoration: BoxDecoration(
-            color: const Color(0xFFF4D2DE),
+            color: accentPink,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: accentPink.withValues(alpha: 0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: const Icon(
             Icons.person_outline_rounded,
             color: Colors.white,
-            size: 20,
+            size: 22,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Welcome back',
+                'Welcome back,',
                 style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
+                  letterSpacing: 0.3,
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               SizedBox(
-                height: 30,
+                height: 28,
                 child: FittedBox(
                   alignment: Alignment.centerLeft,
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    '$_firstName',
+                    _firstName,
                     style: GoogleFonts.plusJakartaSans(
                       color: Colors.white,
-                      fontSize: 25,
+                      fontSize: 24,
                       height: 1,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
                     ),
                   ),
                 ),
@@ -227,30 +320,35 @@ class _HomeWidgetState extends State<HomeWidget> {
           ),
         ),
         Container(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            color: Colors.white.withValues(alpha: 0.08),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
           ),
           child: Stack(
             alignment: Alignment.center,
             children: [
               IconButton(
-                iconSize: 17,
+                iconSize: 18,
+                padding: EdgeInsets.zero,
                 onPressed: _openTopActions,
                 icon: const Icon(Icons.notifications_none_rounded),
                 color: Colors.white,
               ),
               Positioned(
-                top: 11,
-                right: 10,
+                top: 8,
+                right: 8,
                 child: Container(
-                  width: 6,
-                  height: 6,
+                  width: 7,
+                  height: 7,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFE7579A),
+                    color: Color(0xFFFF6B6B),
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Color(0x40FF6B6B), blurRadius: 6),
+                    ],
                   ),
                 ),
               ),
@@ -267,17 +365,26 @@ class _HomeWidgetState extends State<HomeWidget> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9F9FA),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        color: const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x120D0018),
-            blurRadius: 14,
-            offset: Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.03),
+          width: 1,
+        ),
       ),
       child: Column(
         children: [
@@ -287,22 +394,34 @@ class _HomeWidgetState extends State<HomeWidget> {
                 _monthYearLabel(today),
                 style: GoogleFonts.plusJakartaSans(
                   fontWeight: FontWeight.w700,
-                  fontSize: 14,
+                  fontSize: 15,
                   color: textPrimary,
+                  letterSpacing: -0.3,
                 ),
               ),
               const Spacer(),
-              Text(
-                'Today ${today.day}',
-                style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 11,
-                  color: accentPink,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: accentPink.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Today ${today.day}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: accentPink,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 9),
+          const SizedBox(height: 11),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: weekDays
@@ -324,22 +443,22 @@ class _HomeWidgetState extends State<HomeWidget> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxHeight = constraints.maxHeight;
-        final ringSize = math.max(200.0, math.min(228.0, maxHeight * 0.49));
+        final ringSize = math.max(200.0, math.min(228.0, maxHeight * 0.48));
         final quickCardHeight = math.max(
-          116.0,
-          math.min(132.0, maxHeight * 0.27),
+          110.0,
+          math.min(130.0, maxHeight * 0.26),
         );
-        final topPadding = math.max(10.0, math.min(16.0, maxHeight * 0.04));
-        final midGap = math.max(6.0, math.min(10.0, maxHeight * 0.02));
-        final sectionGap = math.max(6.0, math.min(10.0, maxHeight * 0.022));
+        final topPadding = math.max(12.0, math.min(18.0, maxHeight * 0.05));
+        final midGap = math.max(8.0, math.min(12.0, maxHeight * 0.025));
+        final sectionGap = math.max(8.0, math.min(14.0, maxHeight * 0.025));
 
         return Container(
           width: double.infinity,
           decoration: const BoxDecoration(
             color: Color(0xFFF6F1F4),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
           ),
-          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 8),
+          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -352,20 +471,32 @@ class _HomeWidgetState extends State<HomeWidget> {
                       176.0,
                       math.min(
                         ringSize,
-                        upperHeight * (upperCompact ? 0.64 : 0.70),
+                        upperHeight * (upperCompact ? 0.62 : 0.68),
                       ),
                     );
-                    final showInsight = upperHeight > 232;
+                    final showInsight = upperHeight > 240;
 
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        Center(child: _buildCycleRing(size: adaptiveRing)),
-                        SizedBox(height: upperCompact ? 6 : midGap),
-                        const _MeterLines(),
+                        Center(child: _buildCycleRing(size: adaptiveRing))
+                            .animate()
+                            .scale(duration: 600.ms, curve: Curves.easeOutBack),
+                        SizedBox(height: upperCompact ? 8 : midGap),
+                        _MeterLines(
+                          phase: _currentPhase,
+                          daysUntilOvulation: _daysUntilOvulation,
+                          cycleProgress: _cycleProgress,
+                        ).animate().fadeIn(delay: 200.ms),
                         if (showInsight) ...[
                           const Spacer(),
-                          _buildDailyInsight(compact: upperCompact),
+                          _buildDailyInsight(
+                            compact: upperCompact,
+                          ).animate().fadeIn(
+                            delay: 300.ms,
+                            duration: 400.ms,
+                            curve: Curves.easeOutCubic,
+                          ),
                         ],
                       ],
                     );
@@ -373,57 +504,71 @@ class _HomeWidgetState extends State<HomeWidget> {
                 ),
               ),
               SizedBox(height: sectionGap),
-              _sectionTitle('Quick Access'),
-              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: _sectionTitle('Quick Access'),
+              ),
+              const SizedBox(height: 12),
               SizedBox(
                 height: quickCardHeight,
                 child: Row(
                   children: [
                     Expanded(
-                      child: _quickCard(
-                        height: quickCardHeight,
-                        title: 'AI\nAssistance',
-                        subtitle: 'Ask anything',
-                        dark: true,
-                        icon: Icons.chat_bubble_outline_rounded,
-                        actionColor: const Color(0xFFE27AAE),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatbotWidget(
-                                userId: widget.userId,
-                                fullName: widget.fullName,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                      child:
+                          _quickCard(
+                            height: quickCardHeight,
+                            title: 'AI\nAssistance',
+                            subtitle: 'Ask anything',
+                            dark: true,
+                            icon: Icons.chat_bubble_outline_rounded,
+                            actionColor: const Color(0xFFE27AAE),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatbotWidget(
+                                    userId: widget.userId,
+                                    fullName: widget.fullName,
+                                  ),
+                                ),
+                              );
+                            },
+                          ).animate().fadeIn(
+                            delay: 400.ms,
+                            duration: 400.ms,
+                            curve: Curves.easeOutCubic,
+                          ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: _quickCard(
-                        height: quickCardHeight,
-                        title: 'Early Symptoms\nDetector',
-                        subtitle: 'Log today',
-                        dark: false,
-                        icon: Icons.search_rounded,
-                        actionColor: accentPink,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  PredictorWidget(fullName: widget.fullName),
-                            ),
-                          );
-                        },
-                      ),
+                      child:
+                          _quickCard(
+                            height: quickCardHeight,
+                            title: 'Early Symptoms\nDetector',
+                            subtitle: 'Log today',
+                            dark: false,
+                            icon: Icons.search_rounded,
+                            actionColor: accentPink,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PredictorWidget(
+                                    fullName: widget.fullName,
+                                  ),
+                                ),
+                              );
+                            },
+                          ).animate().fadeIn(
+                            delay: 400.ms,
+                            duration: 400.ms,
+                            curve: Curves.easeOutCubic,
+                          ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
             ],
           ),
         );
@@ -431,46 +576,81 @@ class _HomeWidgetState extends State<HomeWidget> {
     );
   }
 
+  String _getPhaseAdvice() {
+    switch (_currentPhase) {
+      case 'Period Phase':
+        return 'Rest, stay hydrated, take iron-rich foods';
+      case 'Follicular Phase':
+        return 'Energy boosts! Do cardio, strength training';
+      case 'Ovulation':
+        return 'Peak energy! Best time for workouts';
+      case 'Luteal Phase':
+        return 'Listen to body, gentle yoga, extra sleep';
+      default:
+        return 'Keep water intake and 20 min walk';
+    }
+  }
+
   Widget _buildDailyInsight({bool compact = false}) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(12, compact ? 8 : 10, 12, compact ? 8 : 10),
+      padding: EdgeInsets.fromLTRB(
+        13,
+        compact ? 10 : 12,
+        13,
+        compact ? 10 : 12,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.92),
-            const Color(0xFFF9F0F5),
+            Colors.white.withValues(alpha: 0.95),
+            Colors.white.withValues(alpha: 0.85),
           ],
         ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEEDFE8)),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.04),
+          width: 1,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x100D0018),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 3,
-            height: compact ? 26 : 30,
+            width: 3.5,
+            height: compact ? 28 : 32,
             decoration: BoxDecoration(
               color: accentPink,
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(2),
+              boxShadow: [
+                BoxShadow(
+                  color: accentPink.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: 11),
           Container(
-            width: compact ? 24 : 28,
-            height: compact ? 24 : 28,
+            width: compact ? 26 : 30,
+            height: compact ? 26 : 30,
             decoration: BoxDecoration(
-              color: const Color(0xFFF8DDEA),
-              borderRadius: BorderRadius.circular(8),
+              color: accentPink.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               Icons.auto_graph_rounded,
@@ -478,50 +658,59 @@ class _HomeWidgetState extends State<HomeWidget> {
               color: accentPink,
             ),
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Today Snapshot',
+                  '$_currentPhase • Ovulation in $_daysUntilOvulation days',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: compact ? 11 : 12,
+                    fontSize: compact ? 11.5 : 13,
                     fontWeight: FontWeight.w700,
                     color: textPrimary,
+                    letterSpacing: -0.3,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
-                  'Keep water intake and 20 min walk',
+                  _getPhaseAdvice(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: compact ? 9.0 : 9.8,
+                    fontSize: compact ? 9.2 : 10.2,
                     fontWeight: FontWeight.w500,
                     color: textSecondary,
+                    letterSpacing: -0.1,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: compact ? 7 : 8,
-              vertical: compact ? 4 : 5,
+              horizontal: compact ? 8 : 10,
+              vertical: compact ? 5 : 6,
             ),
             decoration: BoxDecoration(
-              color: const Color(0xFFF9E4ED),
-              borderRadius: BorderRadius.circular(999),
+              color: accentPink.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: accentPink.withValues(alpha: 0.2),
+                width: 0.8,
+              ),
             ),
             child: Text(
               'On Track',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: compact ? 8.2 : 8.8,
+                fontSize: compact ? 8.4 : 9,
                 fontWeight: FontWeight.w700,
                 color: accentPink,
+                letterSpacing: -0.1,
               ),
             ),
           ),
@@ -541,61 +730,84 @@ class _HomeWidgetState extends State<HomeWidget> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      splashColor: dark
+          ? Colors.white.withValues(alpha: 0.1)
+          : accentPink.withValues(alpha: 0.1),
+      highlightColor: dark
+          ? Colors.white.withValues(alpha: 0.05)
+          : accentPink.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
         height: height,
         decoration: BoxDecoration(
-          color: dark ? const Color(0xFF3D162F) : const Color(0xFFF8F7F8),
-          borderRadius: BorderRadius.circular(16),
+          color: dark ? const Color(0xFF3D162F) : const Color(0xFFFAF9FB),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: dark
-                ? Colors.white.withValues(alpha: 0.06)
-                : const Color(0xFFF0E7ED),
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.04),
+            width: 1,
           ),
           boxShadow: dark
-              ? const [
+              ? [
                   BoxShadow(
-                    color: Color(0x160F0219),
-                    blurRadius: 14,
-                    offset: Offset(0, 7),
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ]
-              : null,
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.01),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
         ),
         child: Stack(
           children: [
             Positioned(
-              right: -18,
-              bottom: -22,
+              right: -20,
+              bottom: -18,
               child: Container(
-                width: 70,
-                height: 70,
+                width: 72,
+                height: 72,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: dark
-                      ? Colors.black.withValues(alpha: 0.16)
-                      : const Color(0xFFF0E8ED),
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : actionColor.withValues(alpha: 0.08),
                 ),
               ),
             ),
             Positioned.fill(
               child: LayoutBuilder(
                 builder: (context, c) {
-                  final veryCompact = c.maxHeight < 108;
-                  final compact = c.maxHeight < 122;
-                  final iconSize = veryCompact ? 20.0 : (compact ? 24.0 : 28.0);
+                  final veryCompact = c.maxHeight < 104;
+                  final compact = c.maxHeight < 118;
+                  final iconSize = veryCompact ? 22.0 : (compact ? 26.0 : 30.0);
                   final iconGlyph = veryCompact
-                      ? 11.0
-                      : (compact ? 13.0 : 14.0);
-                  final topGap = veryCompact ? 2.0 : (compact ? 4.0 : 8.0);
-                  final titleGap = veryCompact ? 0.0 : (compact ? 2.0 : 4.0);
+                      ? 12.0
+                      : (compact ? 14.0 : 15.0);
+                  final topGap = veryCompact ? 3.0 : (compact ? 5.0 : 10.0);
+                  final titleGap = veryCompact ? 1.0 : (compact ? 2.5 : 5.0);
 
                   return Padding(
                     padding: EdgeInsets.fromLTRB(
-                      12,
-                      veryCompact ? 5 : 8,
-                      12,
-                      veryCompact ? 5 : 8,
+                      14,
+                      veryCompact ? 6 : 10,
+                      14,
+                      veryCompact ? 6 : 10,
                     ),
                     child: veryCompact
                         ? Column(
@@ -607,16 +819,16 @@ class _HomeWidgetState extends State<HomeWidget> {
                                 height: iconSize,
                                 decoration: BoxDecoration(
                                   color: dark
-                                      ? const Color(0xFF5A2444)
-                                      : const Color(0xFFFADCE8),
-                                  borderRadius: BorderRadius.circular(8),
+                                      ? Colors.white.withValues(alpha: 0.12)
+                                      : actionColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(11),
                                 ),
                                 child: Icon(
                                   icon,
                                   size: iconGlyph,
                                   color: dark
-                                      ? const Color(0xFFF7C5DC)
-                                      : accentPink,
+                                      ? Colors.white.withValues(alpha: 0.8)
+                                      : actionColor,
                                 ),
                               ),
                               Column(
@@ -627,35 +839,38 @@ class _HomeWidgetState extends State<HomeWidget> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 11.8,
+                                      fontSize: 12,
                                       height: 1.15,
-                                      fontWeight: FontWeight.w700,
-                                      color: dark ? Colors.white : textPrimary,
+                                      fontWeight: FontWeight.w800,
+                                      color: dark
+                                          ? Colors.white
+                                          : const Color(0xFF221A26),
+                                      letterSpacing: -0.2,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: 3),
                                   Row(
                                     children: [
-                                      Text(
-                                        '+',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          color: actionColor,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 9,
-                                        ),
+                                      Icon(
+                                        Icons.arrow_forward_rounded,
+                                        color: actionColor,
+                                        size: 9,
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 5),
                                       Expanded(
                                         child: Text(
                                           subtitle,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 8.2,
+                                            fontSize: 8.4,
                                             fontWeight: FontWeight.w600,
                                             color: dark
-                                                ? const Color(0xFFE6B6C9)
-                                                : const Color(0xFFB14876),
+                                                ? Colors.white.withValues(
+                                                    alpha: 0.65,
+                                                  )
+                                                : const Color(0xFF8B7F8F),
+                                            letterSpacing: -0.15,
                                           ),
                                         ),
                                       ),
@@ -667,23 +882,22 @@ class _HomeWidgetState extends State<HomeWidget> {
                           )
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.max,
                             children: [
                               Container(
                                 width: iconSize,
                                 height: iconSize,
                                 decoration: BoxDecoration(
                                   color: dark
-                                      ? const Color(0xFF5A2444)
-                                      : const Color(0xFFFADCE8),
-                                  borderRadius: BorderRadius.circular(8),
+                                      ? Colors.white.withValues(alpha: 0.12)
+                                      : actionColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(11),
                                 ),
                                 child: Icon(
                                   icon,
                                   size: iconGlyph,
                                   color: dark
-                                      ? const Color(0xFFF7C5DC)
-                                      : accentPink,
+                                      ? Colors.white.withValues(alpha: 0.8)
+                                      : actionColor,
                                 ),
                               ),
                               SizedBox(height: topGap),
@@ -692,35 +906,39 @@ class _HomeWidgetState extends State<HomeWidget> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: compact ? 13.0 : 14.0,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w700,
-                                  color: dark ? Colors.white : textPrimary,
+                                  fontSize: compact ? 13.2 : 14.4,
+                                  height: 1.25,
+                                  fontWeight: FontWeight.w800,
+                                  color: dark
+                                      ? Colors.white
+                                      : const Color(0xFF221A26),
+                                  letterSpacing: -0.3,
                                 ),
                               ),
                               SizedBox(height: titleGap),
                               const Spacer(),
                               Row(
                                 children: [
-                                  Text(
-                                    '+',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      color: actionColor,
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    color: actionColor,
+                                    size: 11,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       subtitle,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.plusJakartaSans(
-                                        fontSize: compact ? 8.8 : 9.4,
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: compact ? 9 : 9.8,
+                                        fontWeight: FontWeight.w700,
                                         color: dark
-                                            ? const Color(0xFFE6B6C9)
-                                            : const Color(0xFFB14876),
+                                            ? Colors.white.withValues(
+                                                alpha: 0.65,
+                                              )
+                                            : const Color(0xFF8B7F8F),
+                                        letterSpacing: -0.2,
                                       ),
                                     ),
                                   ),
@@ -739,7 +957,6 @@ class _HomeWidgetState extends State<HomeWidget> {
   }
 
   Widget _buildCycleRing({double size = 220}) {
-    const double progress = 0.72;
     final scale = math.max(0.82, math.min(1.0, size / 220));
 
     return SizedBox(
@@ -765,7 +982,7 @@ class _HomeWidgetState extends State<HomeWidget> {
           ),
           CustomPaint(
             size: Size.square(size),
-            painter: _CycleRingPainter(progress: progress, scale: scale),
+            painter: _CycleRingPainter(progress: _cycleProgress, scale: scale),
           ),
           Column(
             mainAxisSize: MainAxisSize.min,
@@ -787,7 +1004,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                   colors: [Color(0xFF3A1730), Color(0xFF291022)],
                 ).createShader(bounds),
                 child: Text(
-                  '7',
+                  '$_daysUntilOvulation',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 46 * scale,
                     height: 1,
@@ -807,7 +1024,7 @@ class _HomeWidgetState extends State<HomeWidget> {
               ),
               SizedBox(height: 4 * scale),
               Text(
-                'Follicular Phase',
+                _currentPhase,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 10 * scale,
                   fontWeight: FontWeight.w700,
@@ -823,23 +1040,23 @@ class _HomeWidgetState extends State<HomeWidget> {
 
   Widget _buildBottomNav() {
     return SizedBox(
-      height: 90,
+      height: 92,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.bottomCenter,
         children: [
           Container(
-            height: 76,
+            height: 78,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(22),
+                top: Radius.circular(28),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 16,
-                  offset: const Offset(0, -5),
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, -6),
                 ),
               ],
             ),
@@ -851,7 +1068,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                   icon: Icons.fitness_center_rounded,
                   label: 'Workout',
                 ),
-                const SizedBox(width: 68),
+                const SizedBox(width: 70),
                 _navItem(
                   index: 3,
                   icon: Icons.favorite_border_rounded,
@@ -866,7 +1083,7 @@ class _HomeWidgetState extends State<HomeWidget> {
             ),
           ),
           Positioned(
-            top: -8,
+            top: -10,
             child: GestureDetector(
               onTap: () {
                 setState(() => _selectedNavIndex = 2);
@@ -881,29 +1098,30 @@ class _HomeWidgetState extends State<HomeWidget> {
                 );
               },
               child: Container(
-                width: 62,
-                height: 62,
+                width: 66,
+                height: 66,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFFE56AA7), Color(0xFFD24787)],
+                    colors: [accentPink.withValues(alpha: 0.95), accentPink],
                   ),
-                  border: Border.all(color: Colors.white, width: 3),
-                  boxShadow: const [
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [
                     BoxShadow(
-                      color: Color(0x40B93673),
-                      blurRadius: 20,
-                      offset: Offset(0, 8),
+                      color: accentPink.withValues(alpha: 0.35),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: accentPink.withValues(alpha: 0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
+                child: Icon(Icons.add_rounded, color: Colors.white, size: 30),
               ),
             ),
           ),
@@ -930,19 +1148,27 @@ class _HomeWidgetState extends State<HomeWidget> {
             ),
           );
         }
-        // Nutrition (index 3) now shows as a tab inline - no navigation needed
       },
       child: SizedBox(
         width: 64,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? accentPink : const Color(0xFFB2A8B5),
-              size: 20,
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? accentPink.withValues(alpha: 0.12)
+                    : Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? accentPink : const Color(0xFFB2A8B5),
+                size: 22,
+              ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 6),
             Text(
               label,
               maxLines: 1,
@@ -951,6 +1177,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected ? accentPink : const Color(0xFFB2A8B5),
+                letterSpacing: -0.1,
               ),
             ),
           ],
@@ -972,31 +1199,40 @@ class _DayCell extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 30,
-          height: 22,
+          width: 32,
+          height: 24,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isToday ? const Color(0xFFF5DCE6) : Colors.transparent,
-            borderRadius: BorderRadius.circular(11),
+            color: isToday ? const Color(0xFFD24787) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isToday
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFD24787).withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
           ),
           child: Text(
             day,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: isToday
-                  ? const Color(0xFFC54882)
-                  : const Color(0xFF6A606D),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: isToday ? Colors.white : const Color(0xFF6A606D),
+              letterSpacing: -0.2,
             ),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         Text(
           week,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 9,
-            fontWeight: FontWeight.w500,
-            color: isToday ? const Color(0xFFC54882) : const Color(0xFFB3ABB6),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: isToday ? const Color(0xFFD24787) : const Color(0xFFB3ABB6),
+            letterSpacing: -0.1,
           ),
         ),
       ],
@@ -1005,36 +1241,101 @@ class _DayCell extends StatelessWidget {
 }
 
 class _MeterLines extends StatelessWidget {
-  const _MeterLines();
+  const _MeterLines({
+    required this.phase,
+    required this.daysUntilOvulation,
+    required this.cycleProgress,
+  });
+
+  final String phase;
+  final int daysUntilOvulation;
+  final double cycleProgress;
 
   @override
   Widget build(BuildContext context) {
+    // Calculate widths based on cycle phase
+    // Follicular: ~8 days, Ovulation window: ~5 days, Luteal: ~14 days
+    final follicularDays = 8;
+    final ovulationWindowDays = 5;
+    final lutealDays = 14;
+
+    // Determine active line based on phase
+    int activeLine = 0;
+    if (phase == 'Period Phase') {
+      activeLine = 0;
+    } else if (phase == 'Follicular Phase') {
+      activeLine = 1;
+    } else if (phase == 'Ovulation') {
+      activeLine = 2;
+    } else {
+      activeLine = 3;
+    }
+
+    // Calculate widths as percentage of cycle progress
+    final baseWidth = 60.0;
+    final follicularWidth =
+        baseWidth * (phase == 'Follicular Phase' ? cycleProgress * 2 : 0.8);
+    final ovulationWidth =
+        baseWidth *
+        (phase == 'Ovulation'
+            ? cycleProgress * 1.5
+            : daysUntilOvulation < 7
+            ? 0.9
+            : 0.6);
+    final lutealWidth =
+        baseWidth * (phase == 'Luteal Phase' ? cycleProgress * 1.2 : 0.7);
+
     return Row(
-      children: const [
-        _MeterLine(width: 52, active: true),
-        SizedBox(width: 8),
-        _MeterLine(width: 84),
-        SizedBox(width: 8),
-        _MeterLine(width: 64),
+      children: [
+        _MeterLine(
+          width: follicularWidth.clamp(28.0, 88.0),
+          active: activeLine == 1,
+          label: 'Follicular',
+        ),
+        const SizedBox(width: 8),
+        _MeterLine(
+          width: ovulationWidth.clamp(32.0, 96.0),
+          active: activeLine == 2,
+          label: 'Ovulation',
+        ),
+        const SizedBox(width: 8),
+        _MeterLine(
+          width: lutealWidth.clamp(28.0, 80.0),
+          active: activeLine == 3,
+          label: 'Luteal',
+        ),
       ],
     );
   }
 }
 
 class _MeterLine extends StatelessWidget {
-  const _MeterLine({required this.width, this.active = false});
+  const _MeterLine({required this.width, this.active = false, this.label = ''});
 
   final double width;
   final bool active;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: 4,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(3),
-        color: active ? const Color(0xFFDC7EAA) : const Color(0xFFE7DFE4),
+    return Tooltip(
+      message: label,
+      child: Container(
+        width: width,
+        height: 5,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(3),
+          color: active ? const Color(0xFFD24787) : const Color(0xFFE5D9E0),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFD24787).withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
       ),
     );
   }

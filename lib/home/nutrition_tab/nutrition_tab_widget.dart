@@ -82,18 +82,12 @@ class NutritionTabWidget extends StatefulWidget {
 class _NutritionTabWidgetState extends State<NutritionTabWidget>
     with WidgetsBindingObserver {
   late final FoodScannerModel _model;
-  bool _didAutoOpenCamera = false;
+  bool _showCaptureFlow = false;
 
   @override
   void initState() {
     super.initState();
     _model = FoodScannerModel();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _didAutoOpenCamera) return;
-      _didAutoOpenCamera = true;
-      _openCameraFlow();
-    });
   }
 
   @override
@@ -217,21 +211,473 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
               children: [
                 Positioned.fill(child: _buildBackground()),
                 Positioned.fill(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: _model.result != null
-                            ? _buildResultView()
-                            : const SizedBox.shrink(),
-                      ),
-                      _buildCameraControls(),
-                    ],
-                  ),
+                  child: _showCaptureFlow
+                      ? Column(
+                          children: [
+                            Expanded(
+                              child: _model.result != null
+                                  ? _buildResultView()
+                                  : const SizedBox.shrink(),
+                            ),
+                            _buildCameraControls(),
+                          ],
+                        )
+                      : _buildLandingScreen(),
                 ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildLandingScreen() {
+    return Scaffold(
+      backgroundColor: _NutritionDS.pageBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: SizedBox(
+            height:
+                MediaQuery.of(context).size.height -
+                MediaQuery.of(context).padding.top -
+                30,
+            child: Column(
+              children: [
+                // Header Section
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                RichText(
+                                  text: TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: 'Perfect ',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w800,
+                                          color: _NutritionDS.textPrimary,
+                                          letterSpacing: -0.5,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: 'Food Scanner',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w800,
+                                          color: _NutritionDS.accentPink,
+                                          letterSpacing: -0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Instant nutrition analysis with AI',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: _NutritionDS.textSecondary,
+                                    letterSpacing: -0.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _NutritionDS.warning.withValues(
+                                alpha: 0.15,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.flash_on,
+                                  size: 12,
+                                  color: _NutritionDS.warning,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'AI Powered',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: _NutritionDS.warning,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Benefits Row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildBenefitItem(
+                          icon: Icons.bar_chart_rounded,
+                          label: 'Macros',
+                          color: _NutritionDS.warning,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildBenefitItem(
+                          icon: Icons.favorite_rounded,
+                          label: 'Health',
+                          color: _NutritionDS.danger,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildBenefitItem(
+                          icon: Icons.flash_on_rounded,
+                          label: 'Instant',
+                          color: const Color(0xFF6DBEFF),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // TODAY'S GOAL Section with Food Image
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          _NutritionDS.brandDark,
+                          _NutritionDS.brandDark.withValues(alpha: 0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(_NutritionDS.r16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        // Left side: Text and button
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "TODAY'S GOAL",
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Scan your\nmeal,\nknow your\nintake',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -0.4,
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  setState(() => _showCaptureFlow = true);
+                                  _openCameraFlow();
+                                },
+                                icon: Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                                label: Text(
+                                  "Scan",
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _NutritionDS.accentPink,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 10,
+                                  ),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Right side: Food image (no box)
+                        Expanded(
+                          flex: 3,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              _NutritionDS.r16,
+                            ),
+                            child: Image.asset(
+                              'assests/images/foodscanner_person.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Icon(
+                                    Icons.restaurant_rounded,
+                                    size: 32,
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Scan Your Meal Label
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Scan Your Meal',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: _NutritionDS.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Camera & Gallery Cards (Horizontal)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildSquareActionCard(
+                          icon: Icons.camera_alt_rounded,
+                          title: 'Camera',
+                          subtitle: 'Snap & analyze\ninstantly',
+                          color: _NutritionDS.accentPink,
+                          onTap: _handleCameraTap,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: _buildSquareActionCard(
+                          icon: Icons.image_rounded,
+                          title: 'Gallery',
+                          subtitle: 'Pick from your\nphotos',
+                          color: const Color(0xFF6DBEFF),
+                          onTap: _handleGalleryTap,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Spacer(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleCameraTap() {
+    if (!mounted) return;
+    setState(() => _showCaptureFlow = true);
+    _openCameraFlow();
+  }
+
+  void _handleGalleryTap() {
+    if (!mounted) return;
+    setState(() => _showCaptureFlow = true);
+    _pickFromGalleryAndAnalyse();
+  }
+
+  Widget _buildBenefitItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_NutritionDS.r12),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.04),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(_NutritionDS.r10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: _NutritionDS.textPrimary,
+              letterSpacing: -0.2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSquareActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      splashColor: color.withValues(alpha: 0.1),
+      highlightColor: color.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(_NutritionDS.r14),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(_NutritionDS.r14),
+            border: Border.all(
+              color: color.withValues(alpha: 0.15),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+              BoxShadow(
+                color: color.withValues(alpha: 0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(_NutritionDS.r12),
+                ),
+                child: Icon(icon, color: color, size: 26),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: _NutritionDS.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  subtitle,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: _NutritionDS.textSecondary,
+                    letterSpacing: -0.1,
+                    height: 1.3,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Icon(Icons.arrow_forward_rounded, color: color, size: 16),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -513,10 +959,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                   GestureDetector(
                     onTap: () {
                       _model.clear();
-                      _didAutoOpenCamera = false;
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) _openCameraFlow();
-                      });
+                      setState(() => _showCaptureFlow = false);
                     },
                     child: Container(
                       width: 40,
@@ -885,10 +1328,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                     child: ElevatedButton(
                       onPressed: () {
                         _model.clear();
-                        _didAutoOpenCamera = false;
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) _openCameraFlow();
-                        });
+                        setState(() => _showCaptureFlow = false);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _NutritionDS.textPrimary,
