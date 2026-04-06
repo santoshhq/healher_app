@@ -54,7 +54,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Image.asset('assests/images/healhericon.png'),
+                        child: Image.asset('assets/images/healhericon.png'),
                       ),
                     )
                     .animate()
@@ -433,3 +433,4 @@ class _LoginWidgetState extends State<LoginWidget> {
     );
   }
 }
+

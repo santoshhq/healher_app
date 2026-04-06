@@ -562,3 +562,4 @@ class _PredictorWidgetState extends State<PredictorWidget> {
     );
   }
 }
+

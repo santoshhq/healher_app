@@ -82,7 +82,6 @@ class NutritionTabWidget extends StatefulWidget {
 class _NutritionTabWidgetState extends State<NutritionTabWidget>
     with WidgetsBindingObserver {
   late final FoodScannerModel _model;
-  bool _showCaptureFlow = false;
 
   @override
   void initState() {
@@ -210,20 +209,10 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
             child: Stack(
               children: [
                 Positioned.fill(child: _buildBackground()),
-                Positioned.fill(
-                  child: _showCaptureFlow
-                      ? Column(
-                          children: [
-                            Expanded(
-                              child: _model.result != null
-                                  ? _buildResultView()
-                                  : const SizedBox.shrink(),
-                            ),
-                            _buildCameraControls(),
-                          ],
-                        )
-                      : _buildLandingScreen(),
-                ),
+                Positioned.fill(child: _buildLandingScreen()),
+                // Result View Overlay
+                if (_model.result != null)
+                  Positioned.fill(child: _buildResultView()),
               ],
             ),
           );
@@ -417,39 +406,6 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                                   height: 1.2,
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  setState(() => _showCaptureFlow = true);
-                                  _openCameraFlow();
-                                },
-                                icon: Icon(
-                                  Icons.camera_alt_rounded,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                                label: Text(
-                                  "Scan",
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _NutritionDS.accentPink,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 10,
-                                  ),
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -462,7 +418,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                               _NutritionDS.r16,
                             ),
                             child: Image.asset(
-                              'assests/images/foodscanner_person.png',
+                              'assets/images/foodscanner_person.png',
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Center(
@@ -481,15 +437,15 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // Scan Your Meal Label
+                // Section Label
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Scan Your Meal',
+                      'Start Scanning',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -500,7 +456,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                   ),
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
                 // Camera & Gallery Cards (Horizontal)
                 Padding(
@@ -513,7 +469,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                           title: 'Camera',
                           subtitle: 'Snap & analyze\ninstantly',
                           color: _NutritionDS.accentPink,
-                          onTap: _handleCameraTap,
+                          onTap: _openCameraFlow,
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -523,7 +479,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                           title: 'Gallery',
                           subtitle: 'Pick from your\nphotos',
                           color: const Color(0xFF6DBEFF),
-                          onTap: _handleGalleryTap,
+                          onTap: _pickFromGalleryAndAnalyse,
                         ),
                       ),
                     ],
@@ -535,68 +491,6 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  void _handleCameraTap() {
-    if (!mounted) return;
-    setState(() => _showCaptureFlow = true);
-    _openCameraFlow();
-  }
-
-  void _handleGalleryTap() {
-    if (!mounted) return;
-    setState(() => _showCaptureFlow = true);
-    _pickFromGalleryAndAnalyse();
-  }
-
-  Widget _buildBenefitItem({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(_NutritionDS.r12),
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.04),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(_NutritionDS.r10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: _NutritionDS.textPrimary,
-              letterSpacing: -0.2,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }
@@ -678,6 +572,56 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBenefitItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_NutritionDS.r12),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.04),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(_NutritionDS.r10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: _NutritionDS.textPrimary,
+              letterSpacing: -0.2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -959,7 +903,6 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                   GestureDetector(
                     onTap: () {
                       _model.clear();
-                      setState(() => _showCaptureFlow = false);
                     },
                     child: Container(
                       width: 40,
@@ -1328,7 +1271,6 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                     child: ElevatedButton(
                       onPressed: () {
                         _model.clear();
-                        setState(() => _showCaptureFlow = false);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _NutritionDS.textPrimary,
@@ -1612,3 +1554,4 @@ class _NutritionCameraCaptureWidgetState
     );
   }
 }
+

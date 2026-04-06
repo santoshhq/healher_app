@@ -98,7 +98,7 @@ class _ForgetPasswordWidgetState extends State<ForgetPasswordWidget> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(10),
-                        child: Image.asset('assests/images/healhericon.png'),
+                        child: Image.asset('assets/images/healhericon.png'),
                       ),
                     )
                     .animate()
@@ -327,3 +327,4 @@ class _ForgetPasswordWidgetState extends State<ForgetPasswordWidget> {
     );
   }
 }
+

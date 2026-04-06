@@ -48,3 +48,4 @@ class AuthSessionService {
     await prefs.remove(_emailKey);
   }
 }
+

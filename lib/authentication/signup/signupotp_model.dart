@@ -116,3 +116,4 @@ class SignupOtpModel {
     return true;
   }
 }
+

@@ -6,11 +6,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../authentication/login_pages/login_widget.dart';
 import '../authentication/services/auth_session_service.dart';
+import 'bottom_nav_widget.dart';
 import 'chatbot/chatbot_widget.dart';
 import 'cycle_module/cycle_module_model.dart';
 import 'cycle_module/cycle_module_widget.dart';
 import 'cycle_module/services/cycle_api_service.dart';
 import 'nutrition_tab/nutrition_tab_widget.dart';
+import 'profile/profile_widget.dart';
 import 'symtoms_predictor/predictor_widget.dart';
 import 'workouts_plans/workouts_plans_widget.dart';
 
@@ -205,6 +207,58 @@ class _HomeWidgetState extends State<HomeWidget> {
     );
   }
 
+  // ── Navigation Handlers ───────────────────────────────────────
+  void _handleNavTap(int index) {
+    setState(() => _selectedNavIndex = index);
+    if (index == 1) {
+      // Navigate to Workout
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => WorkoutsPlansWidget(
+            fullName: widget.fullName,
+            onNavTap: (targetIndex) {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
+              _handleNavTap(targetIndex);
+            },
+            onFabPressed: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
+              _handleFabPressed();
+            },
+          ),
+        ),
+      );
+    } else if (index == 3) {
+      // Nutrition is handled inline - just update index
+    } else if (index == 4) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfileWidget(
+            initialUserId: widget.userId,
+            initialFullName: widget.fullName,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _handleFabPressed() {
+    // FAB pressed - navigate to cycle module
+    setState(() => _selectedNavIndex = 2);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            CycleModuleWidget(userId: widget.userId, fullName: widget.fullName),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show Nutrition Tab inline when selected
@@ -212,7 +266,11 @@ class _HomeWidgetState extends State<HomeWidget> {
       return Scaffold(
         backgroundColor: const Color(0xFFF5F0F3),
         body: const NutritionTabWidget(),
-        bottomNavigationBar: _buildBottomNav(),
+        bottomNavigationBar: BottomNavWidget(
+          selectedIndex: _selectedNavIndex,
+          onNavTap: _handleNavTap,
+          onFabPressed: _handleFabPressed,
+        ),
       );
     }
 
@@ -257,7 +315,11 @@ class _HomeWidgetState extends State<HomeWidget> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: BottomNavWidget(
+        selectedIndex: _selectedNavIndex,
+        onNavTap: _handleNavTap,
+        onFabPressed: _handleFabPressed,
+      ),
     );
   }
 
@@ -1144,7 +1206,21 @@ class _HomeWidgetState extends State<HomeWidget> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => WorkoutsPlansWidget(fullName: widget.fullName),
+              builder: (_) => WorkoutsPlansWidget(
+                fullName: widget.fullName,
+                onNavTap: (targetIndex) {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                  _handleNavTap(targetIndex);
+                },
+                onFabPressed: () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                  _handleFabPressed();
+                },
+              ),
             ),
           );
         }

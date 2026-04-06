@@ -1501,3 +1501,4 @@ class _FoodCameraCaptureWidgetState extends State<_FoodCameraCaptureWidget> {
     );
   }
 }
+

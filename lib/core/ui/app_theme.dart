@@ -100,3 +100,4 @@ class AppTheme {
     return const BoxDecoration(gradient: pageGradient);
   }
 }
+

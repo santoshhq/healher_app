@@ -669,3 +669,4 @@ class _PoseSessionWidgetState extends State<PoseSessionWidget> {
     );
   }
 }
+

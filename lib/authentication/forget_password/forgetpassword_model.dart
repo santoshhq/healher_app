@@ -44,3 +44,4 @@ class ForgetPasswordModel {
     return false;
   }
 }
+

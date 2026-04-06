@@ -378,3 +378,4 @@ class WorkoutsPlansModel extends ChangeNotifier {
     super.dispose();
   }
 }
+

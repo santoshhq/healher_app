@@ -2302,3 +2302,4 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
     );
   }
 }
+

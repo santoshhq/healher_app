@@ -163,3 +163,4 @@ class FoodScannerModel extends ChangeNotifier {
     notifyListeners();
   }
 }
+

@@ -480,3 +480,4 @@ class _ChatbotWidgetState extends State<ChatbotWidget> {
     );
   }
 }
+

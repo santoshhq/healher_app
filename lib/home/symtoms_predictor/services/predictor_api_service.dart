@@ -52,3 +52,4 @@ class PredictorApiException implements Exception {
   @override
   String toString() => message;
 }
+
