@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/ui/app_theme.dart';
+import '../home_widget.dart';
 
 import 'cycle_module_model.dart';
 import 'services/cycle_api_service.dart';
@@ -21,6 +22,11 @@ class CycleModuleWidget extends StatefulWidget {
 
 class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   late final CycleModuleModel _model;
+  late DateTime _calendarMonth;
+  late DateTime _calendarSelected;
+  DateTime? _manualCycleStart;
+  int? _manualCycleLength;
+  int? _manualPeriodLength;
 
   final List<String> _flowOptions = ['light', 'medium', 'heavy'];
   final List<String> _moodOptions = ['low', 'normal', 'good', 'great'];
@@ -29,6 +35,28 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   void initState() {
     super.initState();
     _model = CycleModuleModel(userId: widget.userId);
+    _calendarSelected = DateTime.now();
+    _calendarMonth = DateTime(_calendarSelected.year, _calendarSelected.month);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _model.fetchCycles();
+      await _model.fetchDailyLogs();
+
+      if (!mounted) {
+        return;
+      }
+
+      final latest = _latestCycleRecord;
+      if (latest != null) {
+        setState(() {
+          _calendarSelected = _normalize(latest.startDate);
+          _calendarMonth = DateTime(
+            latest.startDate.year,
+            latest.startDate.month,
+          );
+        });
+      }
+    });
   }
 
   @override
@@ -46,16 +74,274 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
     required DateTime initialDate,
     required ValueChanged<DateTime> onDatePicked,
   }) async {
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(2010),
-      lastDate: DateTime(2100),
-    );
+    final selected = await _showStyledCalendarPicker(initialDate: initialDate);
 
     if (selected != null) {
       onDatePicked(selected);
     }
+  }
+
+  Future<DateTime?> _showStyledCalendarPicker({
+    required DateTime initialDate,
+  }) async {
+    final normalizedInitial = DateTime(
+      initialDate.year,
+      initialDate.month,
+      initialDate.day,
+    );
+
+    return showDialog<DateTime>(
+      context: context,
+      builder: (dialogContext) {
+        DateTime selectedDate = normalizedInitial;
+        DateTime displayedMonth = DateTime(
+          normalizedInitial.year,
+          normalizedInitial.month,
+        );
+
+        const weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+        List<DateTime> monthCells(DateTime month) {
+          final firstOfMonth = DateTime(month.year, month.month, 1);
+          final leading = firstOfMonth.weekday % 7;
+          final start = firstOfMonth.subtract(Duration(days: leading));
+          return List.generate(
+            42,
+            (index) => DateTime(start.year, start.month, start.day + index),
+          );
+        }
+
+        String monthTitle(DateTime date) {
+          const monthNames = [
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December',
+          ];
+          return monthNames[date.month - 1];
+        }
+
+        bool isSameDate(DateTime a, DateTime b) {
+          return a.year == b.year && a.month == b.month && a.day == b.day;
+        }
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final today = DateTime.now();
+            final normalizedToday = DateTime(
+              today.year,
+              today.month,
+              today.day,
+            );
+            final cells = monthCells(displayedMonth);
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 24,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F7F8),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x22000000),
+                      blurRadius: 30,
+                      offset: Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => setModalState(() {
+                            displayedMonth = DateTime(
+                              displayedMonth.year,
+                              displayedMonth.month - 1,
+                            );
+                          }),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(
+                              Icons.chevron_left_rounded,
+                              color: Color(0xFF3D3441),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          monthTitle(displayedMonth),
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF2C232F),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${displayedMonth.year}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF49404E),
+                          ),
+                        ),
+                        const Spacer(),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => setModalState(() {
+                            displayedMonth = DateTime(
+                              displayedMonth.year,
+                              displayedMonth.month + 1,
+                            );
+                          }),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(
+                              Icons.chevron_right_rounded,
+                              color: Color(0xFF3D3441),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        for (final weekday in weekdays)
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                weekday,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF7D7381),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      itemCount: cells.length,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 7,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 6,
+                            childAspectRatio: 1,
+                          ),
+                      itemBuilder: (context, index) {
+                        final date = cells[index];
+                        final inCurrentMonth =
+                            date.month == displayedMonth.month &&
+                            date.year == displayedMonth.year;
+                        final isSelected = isSameDate(date, selectedDate);
+                        final isToday = isSameDate(date, normalizedToday);
+
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () {
+                            setModalState(() => selectedDate = date);
+                          },
+                          child: Container(
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isSelected
+                                  ? const Color(0xFFF8DDEB)
+                                  : Colors.transparent,
+                              border: isToday
+                                  ? Border.all(
+                                      color: const Color(0xFFD24787),
+                                      width: 1.2,
+                                    )
+                                  : null,
+                            ),
+                            child: Text(
+                              '${date.day}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: !inCurrentMonth
+                                    ? const Color(0xFFC5BEC9)
+                                    : (isSelected
+                                          ? const Color(0xFFD24787)
+                                          : const Color(0xFF342D3A)),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF6F6678),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(dialogContext).pop(selectedDate);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD24787),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              'Done',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _submitCycle() async {
@@ -96,6 +382,394 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
             : Colors.red.shade600,
       ),
     );
+  }
+
+  Future<void> _openDailyLogDialog() async {
+    final symptomsController = TextEditingController(
+      text: _model.symptomsController.text,
+    );
+    final sleepController = TextEditingController(
+      text: _model.sleepController.text,
+    );
+    final waterController = TextEditingController(
+      text: _model.waterController.text,
+    );
+
+    String selectedFlow = _model.selectedFlow;
+    String selectedMood = _model.selectedMood;
+    bool didExercise = _model.didExercise;
+
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final inputDecoration = InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: const Color(0xFFF8F4F7),
+              labelStyle: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF675E70),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFEADCE3)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFFD24787),
+                  width: 1.4,
+                ),
+              ),
+            );
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 20,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFCFAFB),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFF1E3EA)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x24000000),
+                      blurRadius: 28,
+                      offset: Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFF9DEE9),
+                              border: Border.all(
+                                color: const Color(0xFFF2C7D8),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.edit_note_rounded,
+                              color: Color(0xFFD24787),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Save Daily Log',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF241D28),
+                                  ),
+                                ),
+                                Text(
+                                  _formatDate(_calendarSelected),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF6D6675),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: selectedFlow,
+                              decoration: inputDecoration.copyWith(
+                                labelText: 'Flow',
+                              ),
+                              items: _flowOptions
+                                  .map(
+                                    (flow) => DropdownMenuItem<String>(
+                                      value: flow,
+                                      child: Text(
+                                        flow,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value == null) {
+                                  return;
+                                }
+                                setDialogState(() => selectedFlow = value);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: selectedMood,
+                              decoration: inputDecoration.copyWith(
+                                labelText: 'Mood',
+                              ),
+                              items: _moodOptions
+                                  .map(
+                                    (mood) => DropdownMenuItem<String>(
+                                      value: mood,
+                                      child: Text(
+                                        mood,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value == null) {
+                                  return;
+                                }
+                                setDialogState(() => selectedMood = value);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: symptomsController,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: inputDecoration.copyWith(
+                          labelText: 'Symptoms (comma separated)',
+                        ),
+                        style: GoogleFonts.poppins(fontSize: 13),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: sleepController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: inputDecoration.copyWith(
+                                labelText: 'Sleep (hrs)',
+                              ),
+                              style: GoogleFonts.poppins(fontSize: 13),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: waterController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: inputDecoration.copyWith(
+                                labelText: 'Water (L)',
+                              ),
+                              style: GoogleFonts.poppins(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F2F6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEADCE3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(11),
+                                onTap: () =>
+                                    setDialogState(() => didExercise = true),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: didExercise
+                                        ? const Color(0xFFD24787)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    'Exercise: Yes',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: didExercise
+                                          ? Colors.white
+                                          : const Color(0xFF554D5D),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(11),
+                                onTap: () =>
+                                    setDialogState(() => didExercise = false),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: !didExercise
+                                        ? const Color(0xFFD24787)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    'Exercise: No',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: !didExercise
+                                          ? Colors.white
+                                          : const Color(0xFF554D5D),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(false),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(42),
+                                side: const BorderSide(
+                                  color: Color(0xFFD7CCD3),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF5C5565),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                final sleep = double.tryParse(
+                                  sleepController.text.trim(),
+                                );
+                                final water = double.tryParse(
+                                  waterController.text.trim(),
+                                );
+
+                                if (sleep == null ||
+                                    sleep < 0 ||
+                                    water == null ||
+                                    water < 0) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Please enter valid sleep and water values.',
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                      backgroundColor: Colors.red.shade600,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                _model.symptomsController.text =
+                                    symptomsController.text.trim();
+                                _model.sleepController.text = sleepController
+                                    .text
+                                    .trim();
+                                _model.waterController.text = waterController
+                                    .text
+                                    .trim();
+                                _model.setFlow(selectedFlow);
+                                _model.setMood(selectedMood);
+                                _model.setExercise(didExercise);
+                                _model.setLogDate(_calendarSelected);
+
+                                Navigator.of(dialogContext).pop(true);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(42),
+                                backgroundColor: const Color(0xFFD24787),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Save Log',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    symptomsController.dispose();
+    sleepController.dispose();
+    waterController.dispose();
+
+    if (shouldSave == true && mounted) {
+      await _submitDailyLog();
+    }
   }
 
   String _monthKey(DateTime date) {
@@ -903,503 +1577,728 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    const Color primary = AppTheme.brandPrimary;
+  DateTime _normalize(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
 
-    return AnimatedBuilder(
-      animation: _model,
-      builder: (context, _) {
-        return Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            foregroundColor: AppTheme.brandInk,
-            elevation: 0,
-            centerTitle: false,
-            title: Text(
-              'Cycle Tracker',
-              style: GoogleFonts.poppins(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.brandInk,
+  bool _sameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  int _safeInt(String value, int fallback) {
+    return int.tryParse(value.trim()) ?? fallback;
+  }
+
+  Future<void> _openCycleSetupDialog() async {
+    final cycleController = TextEditingController(
+      text:
+          (_manualCycleLength ??
+                  _safeInt(_model.cycleLengthController.text, 28))
+              .toString(),
+    );
+    final periodController = TextEditingController(
+      text:
+          (_manualPeriodLength ??
+                  _safeInt(_model.periodLengthController.text, 5))
+              .toString(),
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: Text(
+            'Cycle Setup',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: cycleController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Cycle Length (days)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
-            ),
-            actions: [
-              IconButton(
-                onPressed: _model.isFetchingCycles ? null : _model.fetchCycles,
-                icon: const Icon(
-                  Icons.refresh_rounded,
-                  color: Color(0xFFE91E63),
+              const SizedBox(height: 10),
+              TextField(
+                controller: periodController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Period Length (days)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
           ),
-          body: Container(
-            decoration: AppTheme.pageBackgroundDecoration(),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: -120,
-                  right: -90,
-                  child: Container(
-                    height: 260,
-                    width: 260,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFE91E63).withValues(alpha: 0.08),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final cycle = int.tryParse(cycleController.text.trim());
+                final period = int.tryParse(periodController.text.trim());
+
+                if (cycle == null ||
+                    cycle <= 0 ||
+                    period == null ||
+                    period <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Please enter valid cycle and period lengths.',
+                        style: GoogleFonts.poppins(),
+                      ),
+                      backgroundColor: Colors.red.shade600,
                     ),
+                  );
+                  return;
+                }
+
+                setState(() {
+                  _manualCycleLength = cycle;
+                  _manualPeriodLength = period;
+                  _manualCycleStart ??= _normalize(_calendarSelected);
+                });
+
+                _model.cycleLengthController.text = '$cycle';
+                _model.periodLengthController.text = '$period';
+
+                Navigator.of(dialogContext).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD24787),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  CycleRecord? get _latestCycleRecord {
+    if (_model.cycles.isEmpty) {
+      return null;
+    }
+    final sorted = List<CycleRecord>.from(_model.cycles)
+      ..sort((a, b) => b.startDate.compareTo(a.startDate));
+    return sorted.first;
+  }
+
+  DateTime get _cycleStart {
+    if (_manualCycleStart != null) {
+      return _normalize(_manualCycleStart!);
+    }
+    final latest = _latestCycleRecord;
+    return _normalize(latest?.startDate ?? _model.cycleStartDate);
+  }
+
+  int get _cycleLength {
+    if (_manualCycleLength != null) {
+      return _manualCycleLength!;
+    }
+    final latest = _latestCycleRecord;
+    return latest?.cycleLength ??
+        _safeInt(_model.cycleLengthController.text, 28);
+  }
+
+  int get _periodLength {
+    if (_manualPeriodLength != null) {
+      return _manualPeriodLength!;
+    }
+    final latest = _latestCycleRecord;
+    return latest?.periodLength ??
+        _safeInt(_model.periodLengthController.text, 5);
+  }
+
+  DateTime get _predictedPeriodStart {
+    if (_manualCycleStart != null) {
+      return _normalize(_cycleStart.add(Duration(days: _cycleLength)));
+    }
+    final latest = _latestCycleRecord;
+    if (latest?.predictedNext != null) {
+      return _normalize(latest!.predictedNext!);
+    }
+    return _normalize(_cycleStart.add(Duration(days: _cycleLength)));
+  }
+
+  DateTime get _ovulationDate {
+    if (_manualCycleStart != null || _manualCycleLength != null) {
+      return _normalize(
+        _cycleStart.add(Duration(days: (_cycleLength - 14).clamp(8, 25))),
+      );
+    }
+
+    final latest = _latestCycleRecord;
+    if (latest?.ovulationDate != null) {
+      return _normalize(latest!.ovulationDate!);
+    }
+    return _normalize(
+      _cycleStart.add(Duration(days: (_cycleLength - 14).clamp(8, 25))),
+    );
+  }
+
+  String _calendarMonthText(DateTime date) {
+    const names = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return names[date.month - 1];
+  }
+
+  String _prettyMonthDay(DateTime date) {
+    return '${_calendarMonthText(date)} ${date.day}';
+  }
+
+  List<DateTime> _monthCells(DateTime month) {
+    final first = DateTime(month.year, month.month, 1);
+    final leading = first.weekday % 7;
+    final start = first.subtract(Duration(days: leading));
+    return List.generate(
+      42,
+      (index) => DateTime(start.year, start.month, start.day + index),
+    );
+  }
+
+  bool _isPeriodDay(DateTime date) {
+    final normalized = _normalize(date);
+    final start = _cycleStart;
+    final end = _cycleStart.add(Duration(days: _periodLength - 1));
+    return !normalized.isBefore(start) && !normalized.isAfter(end);
+  }
+
+  bool _isPredictedPeriodDay(DateTime date) {
+    final normalized = _normalize(date);
+    final start = _predictedPeriodStart;
+    final end = start.add(Duration(days: _periodLength - 1));
+    return !normalized.isBefore(start) && !normalized.isAfter(end);
+  }
+
+  bool _isFertileWindowDay(DateTime date) {
+    final normalized = _normalize(date);
+    final start = _ovulationDate.subtract(const Duration(days: 4));
+    final end = _ovulationDate.add(const Duration(days: 1));
+    return !normalized.isBefore(start) && !normalized.isAfter(end);
+  }
+
+  int get _daysSinceLastPeriod {
+    final now = _normalize(DateTime.now());
+    return now.difference(_cycleStart).inDays.clamp(0, 9999);
+  }
+
+  Future<void> _pickCalendarDate() async {
+    await _pickDate(
+      initialDate: _calendarSelected,
+      onDatePicked: (picked) {
+        setState(() {
+          _calendarSelected = _normalize(picked);
+          _calendarMonth = DateTime(picked.year, picked.month);
+          _manualCycleStart = _normalize(picked);
+        });
+        _model.setCycleStartDate(picked);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _model,
+      builder: (context, _) {
+        final cells = _monthCells(_calendarMonth);
+        const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF4F4F5),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => HomeWidget(
+                                userId: widget.userId,
+                                fullName: widget.fullName,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Ink(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFFEDEDEF),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_rounded,
+                            color: Color(0xFF231A28),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            'Cycle Tracker',
+                            style: GoogleFonts.poppins(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF161217),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 40,
+                        child: IconButton(
+                          onPressed: _openCycleSetupDialog,
+                          icon: const Icon(
+                            Icons.add_rounded,
+                            color: Color(0xFF221A27),
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Positioned(
-                  top: 140,
-                  left: -70,
-                  child: Container(
-                    height: 180,
-                    width: 180,
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFF48FB1).withValues(alpha: 0.15),
+                      color: const Color(0xFFECECEE),
+                      borderRadius: BorderRadius.circular(22),
                     ),
-                  ),
-                ),
-                SafeArea(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(14, 6, 14, 20),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildOverviewCard(),
-                        const SizedBox(height: 14),
-                        _buildSurfaceCard(
+                        Row(
                           children: [
-                            _buildSectionTitle(
-                              title: 'Add Cycle',
-                              subtitle:
-                                  'Save your cycle start and duration details',
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildDatePickerChip(
-                                    label:
-                                        'Start ${_formatDate(_model.cycleStartDate)}',
-                                    icon: Icons.event_available_rounded,
-                                    onTap: () => _pickDate(
-                                      initialDate: _model.cycleStartDate,
-                                      onDatePicked: _model.setCycleStartDate,
+                            InkWell(
+                              onTap: _pickCalendarDate,
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today_outlined,
+                                    size: 15,
+                                    color: Color(0xFF1F1724),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _calendarMonthText(_calendarMonth),
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1B1520),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _buildDatePickerChip(
-                                    label: _model.cycleEndDate == null
-                                        ? 'End Optional'
-                                        : 'End ${_formatDate(_model.cycleEndDate!)}',
-                                    icon: Icons.event_note_rounded,
-                                    onTap: () => _pickDate(
-                                      initialDate:
-                                          _model.cycleEndDate ??
-                                          _model.cycleStartDate,
-                                      onDatePicked: _model.setCycleEndDate,
-                                    ),
+                                  const Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 18,
+                                    color: Color(0xFF1F1724),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildInput(
-                                    label: 'Cycle Length',
-                                    controller: _model.cycleLengthController,
-                                    keyboardType: TextInputType.number,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _buildInput(
-                                    label: 'Period Length',
-                                    controller: _model.periodLengthController,
-                                    keyboardType: TextInputType.number,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_model.addCycleError != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  _model.addCycleError!,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    color: Colors.red.shade700,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                                ],
                               ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _model.isSubmittingCycle
-                                    ? null
-                                    : _submitCycle,
-                                icon: _model.isSubmittingCycle
-                                    ? const SizedBox(
-                                        height: 16,
-                                        width: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Icon(Icons.check_circle_outline),
-                                label: Text(
-                                  _model.isSubmittingCycle
-                                      ? 'Saving...'
-                                      : 'Save Cycle',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  elevation: 0,
-                                  backgroundColor: primary,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size.fromHeight(48),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${_calendarMonth.year}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF201A25),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        _buildSurfaceCard(
+                        Row(
                           children: [
-                            _buildSectionTitle(
-                              title: 'Daily Log',
-                              subtitle: 'Track mood, flow, and wellness habits',
-                            ),
-                            const SizedBox(height: 12),
-                            _buildDatePickerChip(
-                              label: 'Log Date ${_formatDate(_model.logDate)}',
-                              icon: Icons.calendar_month_rounded,
-                              onTap: () => _pickDate(
-                                initialDate: _model.logDate,
-                                onDatePicked: _model.setLogDate,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    value: _model.selectedFlow,
-                                    items: _flowOptions
-                                        .map(
-                                          (e) => DropdownMenuItem<String>(
-                                            value: e,
-                                            child: Text(
-                                              e.toUpperCase(),
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        _model.setFlow(value);
-                                      }
-                                    },
-                                    decoration: _inputDecoration(label: 'Flow'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    value: _model.selectedMood,
-                                    items: _moodOptions
-                                        .map(
-                                          (e) => DropdownMenuItem<String>(
-                                            value: e,
-                                            child: Text(
-                                              e.toUpperCase(),
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        _model.setMood(value);
-                                      }
-                                    },
-                                    decoration: _inputDecoration(label: 'Mood'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            _buildInput(
-                              label: 'Symptoms (comma separated)',
-                              controller: _model.symptomsController,
-                              hint: 'cramps, headache',
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildInput(
-                                    label: 'Sleep Hours',
-                                    controller: _model.sleepController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _buildInput(
-                                    label: 'Water Intake (L)',
-                                    controller: _model.waterController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFF7FB),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: const Color(0xFFF4DAE7),
-                                ),
-                              ),
-                              child: SwitchListTile.adaptive(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                activeColor: primary,
-                                title: Text(
-                                  'Exercise done today',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF4A4152),
-                                  ),
-                                ),
-                                value: _model.didExercise,
-                                onChanged: _model.setExercise,
-                              ),
-                            ),
-                            if (_model.addLogError != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  _model.addLogError!,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    color: Colors.red.shade700,
-                                    fontWeight: FontWeight.w600,
+                            for (final d in weekdayLabels)
+                              Expanded(
+                                child: Center(
+                                  child: Text(
+                                    d,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF2B2630),
+                                    ),
                                   ),
                                 ),
                               ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _model.isSubmittingLog
-                                    ? null
-                                    : _submitDailyLog,
-                                icon: _model.isSubmittingLog
-                                    ? const SizedBox(
-                                        height: 16,
-                                        width: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Icon(Icons.edit_note_rounded),
-                                label: Text(
-                                  _model.isSubmittingLog
-                                      ? 'Saving...'
-                                      : 'Save Daily Log',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  elevation: 0,
-                                  backgroundColor: primary,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size.fromHeight(48),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        _buildSurfaceCard(
-                          children: [
-                            InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: _openCycleHistoryDialog,
-                              child: Ink(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 14,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF7FB),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFFF4DAE7),
+                        const SizedBox(height: 10),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: cells.length,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 7,
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 6,
+                                childAspectRatio: 1,
+                              ),
+                          itemBuilder: (context, index) {
+                            final date = cells[index];
+                            final inMonth = date.month == _calendarMonth.month;
+                            final isSelected = _sameDay(
+                              date,
+                              _calendarSelected,
+                            );
+                            final isPeriod = _isPeriodDay(date);
+                            final isPredicted = _isPredictedPeriodDay(date);
+                            final isFertile = _isFertileWindowDay(date);
+
+                            Color textColor;
+                            if (!inMonth) {
+                              textColor = const Color(0xFFB4B0B8);
+                            } else {
+                              textColor = const Color(0xFF221C27);
+                            }
+
+                            BoxDecoration? decoration;
+                            if (isPeriod) {
+                              decoration = const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFFF6D5E3),
+                              );
+                            } else if (isFertile) {
+                              decoration = const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFFD7D6FF),
+                              );
+                            } else if (inMonth) {
+                              decoration = const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFFF8F8F9),
+                              );
+                            }
+
+                            Border? border;
+                            if (isSelected) {
+                              border = Border.all(
+                                color: const Color(0xFF5956D6),
+                                width: 1.3,
+                              );
+                            } else if (isPredicted) {
+                              border = Border.all(
+                                color: const Color(0xFFD24787),
+                                width: 1.2,
+                                strokeAlign: BorderSide.strokeAlignInside,
+                              );
+                            }
+
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () {
+                                final picked = _normalize(date);
+                                setState(() {
+                                  _calendarSelected = picked;
+                                  _manualCycleStart = picked;
+                                });
+                                _model.setCycleStartDate(picked);
+                              },
+                              child: Container(
+                                alignment: Alignment.center,
+                                decoration:
+                                    (decoration ??
+                                            const BoxDecoration(
+                                              shape: BoxShape.circle,
+                                            ))
+                                        .copyWith(border: border),
+                                child: Text(
+                                  '${date.day}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: textColor,
                                   ),
                                 ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      height: 38,
-                                      width: 38,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFE3EE),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Icon(
-                                        Icons.calendar_view_month_rounded,
-                                        color: Color(0xFFE91E63),
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Cycle History',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF2A2230),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Tap to open fixed-size monthly timeline',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 11,
-                                              color: const Color(0xFF7A7383),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 16,
-                                      color: Color(0xFF8B8295),
-                                    ),
-                                  ],
-                                ),
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: _openDailyLogHistoryDialog,
-                              child: Ink(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 14,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8F1FC),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFFE8D9F1),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      height: 38,
-                                      width: 38,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEFE1F7),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Icon(
-                                        Icons.fact_check_rounded,
-                                        color: Color(0xFF7B1FA2),
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Daily Logs History',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF2A2230),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Tap to view all saved daily logs',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 11,
-                                              color: const Color(0xFF7A7383),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 16,
-                                      color: Color(0xFF8B8295),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _legendDot(const Color(0xFFF6B9CD)),
+                      const SizedBox(width: 6),
+                      _legendLabel('Period'),
+                      const SizedBox(width: 14),
+                      _legendPredictedDot(),
+                      const SizedBox(width: 6),
+                      _legendLabel('Predicted Period'),
+                      const SizedBox(width: 14),
+                      _legendDot(const Color(0xFFC8C7FF)),
+                      const SizedBox(width: 6),
+                      _legendLabel('Fertile Window'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFF07AB1), Color(0xFFE85E9C)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'Your period is likely to start on or around ${_prettyMonthDay(_predictedPeriodStart)}.',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        height: 1.25,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF2A0F1D),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (_model.fetchCyclesError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        _model.fetchCyclesError!,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  Text(
+                    'Last Menstrual Period',
+                    style: GoogleFonts.poppins(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF111014),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECECEE),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFF9DEE9),
+                            border: Border.all(color: const Color(0xFFF2C7D8)),
+                          ),
+                          child: const Icon(
+                            Icons.watch_later_outlined,
+                            size: 17,
+                            color: Color(0xFFD24787),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Started ${_calendarMonthText(_cycleStart)} ${_cycleStart.day}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF161219),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$_daysSinceLastPeriod days ago',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF6D6674),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _model.isSubmittingCycle
+                              ? null
+                              : () {
+                                  _model.setCycleStartDate(_calendarSelected);
+                                  _submitCycle();
+                                },
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                            side: const BorderSide(color: Color(0xFFD24787)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _model.isSubmittingCycle
+                                ? 'Saving...'
+                                : 'Save Cycle Start',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFD24787),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _model.isSubmittingLog
+                              ? null
+                              : _openDailyLogDialog,
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                            backgroundColor: const Color(0xFFD24787),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _model.isSubmittingLog
+                                ? 'Saving...'
+                                : 'Save Daily Log',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton.icon(
+                          onPressed: _openCycleHistoryDialog,
+                          icon: const Icon(
+                            Icons.calendar_view_month_rounded,
+                            color: Color(0xFFD24787),
+                            size: 18,
+                          ),
+                          label: Text(
+                            'Cycle History',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF3A313F),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextButton.icon(
+                          onPressed: _openDailyLogHistoryDialog,
+                          icon: const Icon(
+                            Icons.fact_check_rounded,
+                            color: Color(0xFF7B1FA2),
+                            size: 18,
+                          ),
+                          label: Text(
+                            'Logs History',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF3A313F),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _legendDot(Color color) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+
+  Widget _legendPredictedDot() {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.transparent,
+        border: Border.all(color: const Color(0xFFD24787), width: 1.1),
+      ),
+    );
+  }
+
+  Widget _legendLabel(String text) {
+    return Text(
+      text,
+      style: GoogleFonts.poppins(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: const Color(0xFF28242C),
+      ),
     );
   }
 }

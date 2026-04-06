@@ -1,12 +1,242 @@
 import 'dart:io';
-import 'dart:convert';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../core/ui/app_theme.dart';
-
 import 'foodscanner_model.dart';
 
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+class _DS {
+  // Brand palette
+  static const bg = Color(0xFF0E0E12);
+  static const surface = Color(0xFF16161C);
+  static const surfaceHigh = Color(0xFF1E1E28);
+  static const card = Color(0xFF1C1C24);
+  static const cardBorder = Color(0xFF2A2A38);
+
+  static const accent = Color(0xFFD4F26E); // lime-green accent
+  static const accentDim = Color(0xFF8FAD35);
+  static const accentBg = Color(0xFF1E2410);
+
+  static const danger = Color(0xFFFF6B6B);
+  static const warning = Color(0xFFFFC66D);
+  static const info = Color(0xFF6DBEFF);
+
+  static const textPrimary = Color(0xFFF4F4F6);
+  static const textSecondary = Color(0xFF8888A0);
+  static const textMuted = Color(0xFF555568);
+
+  // Macro colours
+  static const carbColor = Color(0xFFFFC66D);
+  static const proteinColor = Color(0xFF6DBEFF);
+  static const fatColor = Color(0xFFD4F26E);
+
+  // Radii
+  static const r8 = 8.0;
+  static const r12 = 12.0;
+  static const r16 = 16.0;
+  static const r20 = 20.0;
+  static const r28 = 28.0;
+  static const r36 = 36.0;
+
+  // Text styles
+  static TextStyle display(double size, {Color? color, FontWeight? weight}) =>
+      GoogleFonts.dmSans(
+        fontSize: size,
+        fontWeight: weight ?? FontWeight.w700,
+        color: color ?? textPrimary,
+        letterSpacing: -0.5,
+      );
+
+  static TextStyle body(double size, {Color? color, FontWeight? weight}) =>
+      GoogleFonts.dmSans(
+        fontSize: size,
+        fontWeight: weight ?? FontWeight.w400,
+        color: color ?? textSecondary,
+      );
+
+  static TextStyle mono(double size, {Color? color}) =>
+      GoogleFonts.spaceGrotesk(
+        fontSize: size,
+        fontWeight: FontWeight.w600,
+        color: color ?? textPrimary,
+        letterSpacing: -0.3,
+      );
+}
+
+// ─── Shared Helpers ───────────────────────────────────────────────────────────
+Widget _pill({
+  required Widget child,
+  Color bg = _DS.surfaceHigh,
+  EdgeInsets padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+  double radius = _DS.r36,
+  Color? border,
+}) => Container(
+  padding: padding,
+  decoration: BoxDecoration(
+    color: bg,
+    borderRadius: BorderRadius.circular(radius),
+    border: border != null ? Border.all(color: border, width: 1) : null,
+  ),
+  child: child,
+);
+
+Widget _iconBtn({
+  required IconData icon,
+  required VoidCallback? onTap,
+  double size = 42,
+  Color bg = const Color(0x33FFFFFF),
+  Color fg = Colors.white,
+}) => GestureDetector(
+  onTap: onTap,
+  child: Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: bg,
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+    ),
+    child: Icon(icon, color: fg, size: size * 0.44),
+  ),
+);
+
+// ─── Scan Corner Reticle ──────────────────────────────────────────────────────
+Widget _buildReticle() {
+  Widget corner(Alignment align, bool top, bool left) {
+    return Align(
+      alignment: align,
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: top
+                  ? const BorderSide(color: _DS.accent, width: 2.5)
+                  : BorderSide.none,
+              bottom: !top
+                  ? const BorderSide(color: _DS.accent, width: 2.5)
+                  : BorderSide.none,
+              left: left
+                  ? const BorderSide(color: _DS.accent, width: 2.5)
+                  : BorderSide.none,
+              right: !left
+                  ? const BorderSide(color: _DS.accent, width: 2.5)
+                  : BorderSide.none,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+    );
+  }
+
+  return Positioned.fill(
+    child: IgnorePointer(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(32, 130, 32, 210),
+        child: Stack(
+          children: [
+            // Subtle overlay inside frame
+            Positioned.fill(
+              child: Container(
+                margin: const EdgeInsets.all(1),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _DS.accent.withValues(alpha: 0.08),
+                    width: 1,
+                  ),
+                ),
+              ),
+            ),
+            corner(Alignment.topLeft, true, true),
+            corner(Alignment.topRight, true, false),
+            corner(Alignment.bottomLeft, false, true),
+            corner(Alignment.bottomRight, false, false),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// ─── Macro Circle ────────────────────────────────────────────────────────────
+class _MacroRing extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+  final double progress;
+  final IconData icon;
+
+  const _MacroRing({
+    required this.value,
+    required this.label,
+    required this.color,
+    required this.progress,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 96,
+      child: Column(
+        children: [
+          SizedBox(
+            width: 72,
+            height: 72,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Background track
+                SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: CircularProgressIndicator(
+                    value: 1,
+                    strokeWidth: 5,
+                    color: color.withValues(alpha: 0.1),
+                  ),
+                ),
+                // Progress
+                SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: CircularProgressIndicator(
+                    value: progress.clamp(0.04, 1.0),
+                    strokeWidth: 5,
+                    backgroundColor: Colors.transparent,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                // Center icon + mini ring
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color.withValues(alpha: 0.1),
+                  ),
+                  child: Icon(icon, size: 20, color: color),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(value, style: _DS.mono(18, color: _DS.textPrimary)),
+          const SizedBox(height: 2),
+          Text(label, style: _DS.body(12, color: _DS.textSecondary)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Main Widget ──────────────────────────────────────────────────────────────
 class FoodScannerWidget extends StatefulWidget {
   const FoodScannerWidget({super.key});
 
@@ -14,228 +244,523 @@ class FoodScannerWidget extends StatefulWidget {
   State<FoodScannerWidget> createState() => _FoodScannerWidgetState();
 }
 
-class _FoodScannerWidgetState extends State<FoodScannerWidget> {
+class _FoodScannerWidgetState extends State<FoodScannerWidget>
+    with SingleTickerProviderStateMixin {
   late final FoodScannerModel _model;
+  bool _didAutoOpenCamera = false;
+  late final AnimationController _shimmerController;
 
   Future<void> _openCameraFlow() async {
     final capturedPath = await Navigator.push<String>(
       context,
       MaterialPageRoute(builder: (_) => const _FoodCameraCaptureWidget()),
     );
-
-    if (!mounted || capturedPath == null || capturedPath.trim().isEmpty) {
-      return;
-    }
-
-    await _model.setImageFromPath(capturedPath);
+    if (!mounted || capturedPath == null || capturedPath.trim().isEmpty) return;
+    await _model.setImageFromPathAndAnalyse(capturedPath);
   }
 
   @override
   void initState() {
     super.initState();
     _model = FoodScannerModel();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _didAutoOpenCamera) return;
+      _didAutoOpenCamera = true;
+      _openCameraFlow();
+    });
   }
 
   @override
   void dispose() {
     _model.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
-  Widget _buildActionButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback? onPressed,
-    required Color background,
-  }) {
-    return Expanded(
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18),
-        label: Text(
-          label,
-          style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700),
-        ),
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: background,
-          foregroundColor: Colors.white,
-          minimumSize: const Size.fromHeight(46),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+  double _num(String raw) {
+    final m = RegExp(r'[-+]?[0-9]*\.?[0-9]+').firstMatch(raw);
+    return double.tryParse(m?.group(0) ?? '') ?? 0;
+  }
+
+  String _macroDisplay(String raw) {
+    final v = _num(raw);
+    return '${v % 1 == 0 ? v.toInt() : v.toStringAsFixed(1)}g';
+  }
+
+  // ── Empty / Image Background ─────────────────────────────────────────────
+  Widget _buildBackground() {
+    final img = _model.selectedImage;
+    if (img == null || img.path.trim().isEmpty) {
+      return Container(
+        decoration: const BoxDecoration(color: _DS.bg),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _DS.surfaceHigh,
+                  border: Border.all(color: _DS.cardBorder, width: 1.5),
+                ),
+                child: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: _DS.accent,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Point your camera at food', style: _DS.display(18)),
+              const SizedBox(height: 8),
+              Text('or upload from gallery', style: _DS.body(14)),
+            ],
           ),
         ),
-      ),
+      );
+    }
+    final file = File(img.path);
+    if (!file.existsSync()) {
+      return Container(
+        color: _DS.bg,
+        child: Center(child: Text('Image unavailable', style: _DS.body(14))),
+      );
+    }
+    return Image.file(
+      file,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(color: _DS.bg),
     );
   }
 
-  Widget _buildResultCard() {
+  // ── Result Sheet ─────────────────────────────────────────────────────────
+  Widget _buildResultSheet() {
     final result = _model.result;
-    if (result == null) {
-      return const SizedBox.shrink();
-    }
+    if (result == null) return const SizedBox.shrink();
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 20,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            result.foodName,
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1D1B20),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _buildMetricChip(
-                'Calories',
-                result.calories,
-                const Color(0xFFFF8A65),
-              ),
-              const SizedBox(width: 8),
-              _buildMetricChip(
-                'Health Score',
-                result.healthScore,
-                const Color(0xFF43A047),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Macronutrients',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF2E2835),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildMacroCard('Protein', result.protein),
-              _buildMacroCard('Carbs', result.carbs),
-              _buildMacroCard('Fats', result.fats),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildInsightTile(
-            title: 'PCOS Positive',
-            value: result.pcosPositive,
-            color: const Color(0xFFE8F5E9),
-            accent: const Color(0xFF2E7D32),
-          ),
-          const SizedBox(height: 8),
-          _buildInsightTile(
-            title: 'PCOS Caution',
-            value: result.pcosNegative,
-            color: const Color(0xFFFFEBEE),
-            accent: const Color(0xFFC62828),
-          ),
-          const SizedBox(height: 10),
-          _buildInsightTile(
-            title: 'Recommendation',
-            value: result.recommendation,
-            color: const Color(0xFFF3E5F5),
-            accent: const Color(0xFF7B1FA2),
-          ),
-          const SizedBox(height: 8),
-          _buildInsightTile(
-            title: 'Alternative',
-            value: result.alternative,
-            color: const Color(0xFFE3F2FD),
-            accent: const Color(0xFF1565C0),
-          ),
-        ],
-      ),
-    );
-  }
+    final carbs = _num(result.carbs);
+    final protein = _num(result.protein);
+    final fats = _num(result.fats);
+    final total = (carbs + protein + fats).clamp(1, 9999);
+    final score = _num(result.healthScore).clamp(0, 10);
+    final scoreLabel = score >= 7
+        ? 'Excellent'
+        : score >= 4
+        ? 'Moderate'
+        : 'Low';
+    final scoreColor = score >= 7
+        ? _DS.accent
+        : score >= 4
+        ? _DS.warning
+        : _DS.danger;
 
-  Widget _buildRawResponseCard() {
-    final payload = _model.rawResultPayload;
-    if (payload == null || payload.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final maxSheetHeight = MediaQuery.of(context).size.height * 0.72;
 
-    final prettyJson = const JsonEncoder.withIndent('  ').convert(payload);
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'API Response',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 6),
-          SelectableText(
-            prettyJson,
-            style: GoogleFonts.robotoMono(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFFE5E7EB),
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricChip(String label, String value, Color color) {
-    return Expanded(
+    return Align(
+      alignment: Alignment.bottomCenter,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF6C6774),
-              ),
+          color: _DS.card,
+          borderRadius: BorderRadius.circular(_DS.r28),
+          border: Border.all(color: _DS.cardBorder, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.6),
+              blurRadius: 40,
+              offset: const Offset(0, 20),
             ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1D1B20),
+          ],
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 330;
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: _DS.textMuted,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+
+                  // ── Food name + calories row
+                  if (compact)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          result.foodName,
+                          style: _DS.display(22),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text('Nutritional breakdown', style: _DS.body(12)),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _DS.accentBg,
+                            borderRadius: BorderRadius.circular(_DS.r16),
+                            border: Border.all(
+                              color: _DS.accent.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                result.calories,
+                                style: _DS.mono(22, color: _DS.accent),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'kcal',
+                                style: _DS.body(11, color: _DS.accentDim),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                result.foodName,
+                                style: _DS.display(24),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Nutritional breakdown',
+                                style: _DS.body(12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _DS.accentBg,
+                            borderRadius: BorderRadius.circular(_DS.r16),
+                            border: Border.all(
+                              color: _DS.accent.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                result.calories,
+                                style: _DS.mono(22, color: _DS.accent),
+                              ),
+                              Text(
+                                'kcal',
+                                style: _DS.body(11, color: _DS.accentDim),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 20),
+                  Divider(color: _DS.cardBorder, height: 1),
+                  const SizedBox(height: 20),
+
+                  // ── Macro circles
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    runAlignment: WrapAlignment.center,
+                    spacing: 10,
+                    runSpacing: 12,
+                    children: [
+                      _MacroRing(
+                        value: _macroDisplay(result.carbs),
+                        label: 'Carbs',
+                        color: _DS.carbColor,
+                        progress: carbs / total,
+                        icon: Icons.grain_rounded,
+                      ),
+                      _MacroRing(
+                        value: _macroDisplay(result.protein),
+                        label: 'Protein',
+                        color: _DS.proteinColor,
+                        progress: protein / total,
+                        icon: Icons.bubble_chart_rounded,
+                      ),
+                      _MacroRing(
+                        value: _macroDisplay(result.fats),
+                        label: 'Fats',
+                        color: _DS.fatColor,
+                        progress: fats / total,
+                        icon: Icons.eco_rounded,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Health score bar
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _DS.surfaceHigh,
+                      borderRadius: BorderRadius.circular(_DS.r16),
+                      border: Border.all(color: _DS.cardBorder, width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (compact)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: scoreColor.withValues(alpha: 0.15),
+                                    ),
+                                    child: Icon(
+                                      score >= 7
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      size: 14,
+                                      color: scoreColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'Health Score',
+                                    style: _DS.body(
+                                      13,
+                                      color: _DS.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  _pill(
+                                    bg: scoreColor.withValues(alpha: 0.12),
+                                    border: scoreColor.withValues(alpha: 0.3),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    child: Text(
+                                      scoreLabel,
+                                      style: _DS.body(
+                                        11,
+                                        color: scoreColor,
+                                        weight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '${score.toStringAsFixed(score % 1 == 0 ? 0 : 1)}/10',
+                                    style: _DS.mono(15, color: _DS.textPrimary),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          )
+                        else
+                          Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: scoreColor.withValues(alpha: 0.15),
+                                ),
+                                child: Icon(
+                                  score >= 7
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
+                                  size: 14,
+                                  color: scoreColor,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Health Score',
+                                style: _DS.body(13, color: _DS.textSecondary),
+                              ),
+                              const Spacer(),
+                              _pill(
+                                bg: scoreColor.withValues(alpha: 0.12),
+                                border: scoreColor.withValues(alpha: 0.3),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                child: Text(
+                                  scoreLabel,
+                                  style: _DS.body(
+                                    11,
+                                    color: scoreColor,
+                                    weight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${score.toStringAsFixed(score % 1 == 0 ? 0 : 1)}/10',
+                                style: _DS.mono(15, color: _DS.textPrimary),
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: score / 10,
+                            minHeight: 6,
+                            backgroundColor: _DS.cardBorder,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              scoreColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ── Recommendation
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: _DS.surfaceHigh,
+                      borderRadius: BorderRadius.circular(_DS.r16),
+                      border: Border.all(color: _DS.cardBorder, width: 1),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline_rounded,
+                          size: 16,
+                          color: _DS.warning,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            result.recommendation,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: _DS.body(12, color: _DS.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _OutlineBtn(
+                          label: 'Retake',
+                          icon: Icons.camera_alt_outlined,
+                          onTap: _openCameraFlow,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _AccentBtn(
+                          label: 'Save & Next',
+                          onTap: _model.clear,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // ── Error Banner ─────────────────────────────────────────────────────────
+  Widget _buildErrorBanner() {
+    final text = _model.analyzeError ?? _model.pickError;
+    if (text == null) return const SizedBox.shrink();
+    return Positioned(
+      left: 16,
+      right: 16,
+      top: 90,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: _DS.danger.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(_DS.r12),
+          border: Border.all(color: _DS.danger, width: 1),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: _DS.body(
+                  12,
+                  color: Colors.white,
+                  weight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -244,391 +769,378 @@ class _FoodScannerWidgetState extends State<FoodScannerWidget> {
     );
   }
 
-  Widget _buildMacroCard(String title, String value) {
-    return Container(
-      width: 96,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F3FA),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF6F6978),
-            ),
+  // ── Analyze status banner ────────────────────────────────────────────────
+  Widget _buildAnalyzeBanner() {
+    final msg = _model.analyzeMessage;
+    if (msg == null) return const SizedBox.shrink();
+    return Positioned(
+      left: 16,
+      right: 16,
+      top: 90,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: _DS.accent.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(_DS.r12),
+          border: Border.all(
+            color: _DS.accent.withValues(alpha: 0.4),
+            width: 1,
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF2E2835),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInsightTile({
-    required String title,
-    required String value,
-    required Color color,
-    required Color accent,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.16)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: accent,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF2E2835),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeroCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF17253C), Color(0xFF275F95), Color(0xFF367CB8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'AI Meal Intelligence',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: _DS.accent,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Capture or upload a meal to get instant nutrition and PCOS-safe suggestions.',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withValues(alpha: 0.92),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                msg,
+                style: _DS.body(12, color: _DS.accent, weight: FontWeight.w600),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildImagePanel() {
-    return Container(
-      width: double.infinity,
-      height: 230,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEAE1EF)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: _model.selectedImage == null
-          ? Stack(
-              children: [
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFFF5F8FC),
-                          const Color(0xFFF5ECF3),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
+  // ── Bottom camera controls ───────────────────────────────────────────────
+  Widget _buildCameraControls() {
+    final busy = _model.isAnalyzing || _model.isPickingImage;
+    final hasImage = _model.selectedImage != null;
+
+    return Positioned(
+      left: 20,
+      right: 20,
+      bottom: 24,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Analyse button
+          AnimatedOpacity(
+            opacity: hasImage ? 1 : 0.4,
+            duration: const Duration(milliseconds: 300),
+            child: GestureDetector(
+              onTap: (hasImage && !busy) ? _model.analyseImage : null,
+              child: Container(
+                width: double.infinity,
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: hasImage && !busy
+                      ? const LinearGradient(
+                          colors: [_DS.accent, Color(0xFFB0D44A)],
+                        )
+                      : null,
+                  color: hasImage && !busy ? null : _DS.surfaceHigh,
+                  borderRadius: BorderRadius.circular(_DS.r36),
+                  border: Border.all(
+                    color: hasImage && !busy
+                        ? Colors.transparent
+                        : _DS.cardBorder,
+                    width: 1,
                   ),
                 ),
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.camera_alt_outlined,
-                        size: 30,
-                        color: Color(0xFF7B7384),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No image selected',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: const Color(0xFF7B7384),
+                child: Center(
+                  child: _model.isAnalyzing
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _DS.bg,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Analysing…',
+                              style: _DS.body(
+                                15,
+                                color: _DS.bg,
+                                weight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          'Analyse Meal',
+                          style: _DS.display(
+                            15,
+                            color: hasImage && !busy ? _DS.bg : _DS.textMuted,
+                          ),
                         ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Bottom icon row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _iconBtn(
+                icon: Icons.photo_library_outlined,
+                onTap: busy ? null : _model.pickFromGalleryAndAnalyse,
+                bg: const Color(0x55FFFFFF),
+              ),
+              const SizedBox(width: 24),
+              // Shutter
+              GestureDetector(
+                onTap: busy ? null : _openCameraFlow,
+                child: Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: _DS.accent, width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _DS.accent.withValues(alpha: 0.35),
+                        blurRadius: 20,
+                        spreadRadius: 2,
                       ),
                     ],
                   ),
+                  child: busy
+                      ? const Padding(
+                          padding: EdgeInsets.all(22),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: _DS.bg,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.camera_alt_rounded,
+                          color: _DS.bg,
+                          size: 28,
+                        ),
                 ),
-              ],
-            )
-          : Image.file(
-              File(_model.selectedImage!.path),
-              fit: BoxFit.cover,
-              width: double.infinity,
-            ),
+              ),
+              const SizedBox(width: 24),
+              _iconBtn(
+                icon: Icons.restart_alt_rounded,
+                onTap: _model.clear,
+                bg: const Color(0x55FFFFFF),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     return AnimatedBuilder(
       animation: _model,
       builder: (context, _) {
+        final hasResult = _model.result != null;
+        final hasImage = _model.selectedImage != null;
+
         return Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            foregroundColor: AppTheme.brandInk,
-            title: Text(
-              'Food Scanner',
-              style: GoogleFonts.poppins(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
+          backgroundColor: _DS.bg,
+          body: Stack(
+            children: [
+              // Full-screen background
+              Positioned.fill(child: _buildBackground()),
+
+              // Vignette overlay
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: hasImage
+                          ? [
+                              Colors.black.withValues(alpha: 0.55),
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.75),
+                            ]
+                          : [
+                              _DS.bg.withValues(alpha: 0.7),
+                              Colors.transparent,
+                              _DS.bg.withValues(alpha: 0.5),
+                            ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-            actions: [
-              IconButton(
-                onPressed: _model.clear,
-                icon: const Icon(Icons.restart_alt_rounded),
-              ),
-            ],
-          ),
-          body: Container(
-            decoration: AppTheme.pageBackgroundDecoration(),
-            child: SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(14, 6, 14, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+
+              SafeArea(
+                child: Stack(
                   children: [
-                    _buildHeroCard(),
-                    const SizedBox(height: 12),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isWide = constraints.maxWidth >= 840;
-
-                        if (!isWide) {
-                          return _buildImagePanel();
-                        }
-
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 7, child: _buildImagePanel()),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 5,
-                              child: Container(
-                                height: 230,
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color: const Color(0xFFEAE1EF),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Scan Checklist',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    _scanTip('Keep food fully visible'),
-                                    _scanTip('Use bright lighting'),
-                                    _scanTip('Avoid motion blur'),
-                                    _scanTip('Capture top-down angle'),
-                                  ],
-                                ),
+                    // ── Top bar
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      top: 10,
+                      child: Row(
+                        children: [
+                          _iconBtn(
+                            icon: Icons.arrow_back_ios_new_rounded,
+                            onTap: () => Navigator.of(context).maybePop(),
+                          ),
+                          const Spacer(),
+                          _pill(
+                            bg: Colors.black.withValues(alpha: 0.4),
+                            border: Colors.white.withValues(alpha: 0.15),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: Text(
+                              hasResult ? 'Scan Result' : 'Nutrition Scanner',
+                              style: _DS.body(
+                                14,
+                                color: Colors.white,
+                                weight: FontWeight.w600,
                               ),
                             ),
-                          ],
-                        );
-                      },
+                          ),
+                          const Spacer(),
+                          _iconBtn(
+                            icon: Icons.restart_alt_rounded,
+                            onTap: _model.clear,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _buildActionButton(
-                          label: 'Scan Camera',
-                          icon: Icons.camera_alt_rounded,
-                          onPressed: _model.isPickingImage || _model.isAnalyzing
-                              ? null
-                              : _openCameraFlow,
-                          background: const Color(0xFF0F9D85),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildActionButton(
-                          label: 'Upload Image',
-                          icon: Icons.photo_library_rounded,
-                          onPressed: _model.isPickingImage || _model.isAnalyzing
-                              ? null
-                              : _model.pickFromGallery,
-                          background: AppTheme.brandPrimary,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed:
-                            _model.isAnalyzing ||
-                                _model.isPickingImage ||
-                                _model.selectedImage == null
-                            ? null
-                            : _model.analyseImage,
-                        icon: _model.isAnalyzing
-                            ? const SizedBox(
-                                height: 16,
-                                width: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+
+                    // ── Scan reticle (when no result)
+                    if (!hasResult) _buildReticle(),
+
+                    // ── Scan hint label
+                    if (!hasResult && !hasImage)
+                      Positioned(
+                        bottom: 180,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: _pill(
+                            bg: Colors.black.withValues(alpha: 0.5),
+                            border: _DS.accent.withValues(alpha: 0.3),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 13,
+                                  color: _DS.accent,
                                 ),
-                              )
-                            : const Icon(Icons.analytics_outlined),
-                        label: Text(
-                          _model.isAnalyzing
-                              ? 'Analyzing your food...'
-                              : 'Analyze Food',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          elevation: 0,
-                          minimumSize: const Size.fromHeight(48),
-                          backgroundColor: const Color(0xFFE91E63),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Align food within the frame',
+                                  style: _DS.body(12, color: Colors.white),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    if (_model.pickError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          _model.pickError!,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.red.shade700,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    if (_model.analyzeError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          _model.analyzeError!,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.red.shade700,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    if (_model.analyzeMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          _model.analyzeMessage!,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: const Color(0xFF2E7D32),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    _buildResultCard(),
-                    _buildRawResponseCard(),
+
+                    // ── Banners
+                    _buildErrorBanner(),
+                    _buildAnalyzeBanner(),
+
+                    // ── Camera controls
+                    if (!hasResult) _buildCameraControls(),
+
+                    // ── Result sheet
+                    if (hasResult) _buildResultSheet(),
                   ],
                 ),
               ),
-            ),
+            ],
           ),
         );
       },
     );
   }
+}
 
-  Widget _scanTip(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.check_circle_outline,
-            size: 16,
-            color: Color(0xFF356EA9),
+// ─── Reusable Button Widgets ──────────────────────────────────────────────────
+class _AccentBtn extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+
+  const _AccentBtn({required this.label, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_DS.accent, Color(0xFFB0D44A)],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF4D4657),
-              ),
-            ),
-          ),
-        ],
+          borderRadius: BorderRadius.circular(_DS.r36),
+        ),
+        child: Center(
+          child: Text(label, style: _DS.display(14, color: _DS.bg)),
+        ),
       ),
     );
   }
 }
 
+class _OutlineBtn extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onTap;
+
+  const _OutlineBtn({required this.label, this.icon, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: _DS.surfaceHigh,
+          borderRadius: BorderRadius.circular(_DS.r36),
+          border: Border.all(color: _DS.cardBorder, width: 1),
+        ),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: _DS.textSecondary),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: _DS.body(
+                  14,
+                  color: _DS.textPrimary,
+                  weight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Camera Capture Widget ────────────────────────────────────────────────────
 class _FoodCameraCaptureWidget extends StatefulWidget {
   const _FoodCameraCaptureWidget();
 
@@ -653,9 +1165,7 @@ class _FoodCameraCaptureWidgetState extends State<_FoodCameraCaptureWidget> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         setState(() {
           _isInitializing = false;
           _cameraError = 'No camera found on this device.';
@@ -664,7 +1174,7 @@ class _FoodCameraCaptureWidgetState extends State<_FoodCameraCaptureWidget> {
       }
 
       final preferred = cameras.firstWhere(
-        (camera) => camera.lensDirection == CameraLensDirection.back,
+        (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
 
@@ -685,9 +1195,7 @@ class _FoodCameraCaptureWidgetState extends State<_FoodCameraCaptureWidget> {
         _isInitializing = false;
       });
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _isInitializing = false;
         _cameraError =
@@ -698,27 +1206,18 @@ class _FoodCameraCaptureWidgetState extends State<_FoodCameraCaptureWidget> {
 
   Future<void> _capturePhoto() async {
     final controller = _controller;
-    if (controller == null || !controller.value.isInitialized || _isCapturing) {
+    if (controller == null || !controller.value.isInitialized || _isCapturing)
       return;
-    }
-
-    setState(() {
-      _isCapturing = true;
-    });
-
+    setState(() => _isCapturing = true);
     try {
       final file = await controller.takePicture();
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       Navigator.pop(context, file.path);
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _isCapturing = false;
-        _cameraError = 'Failed to capture image. Please try again.';
+        _cameraError = 'Failed to capture. Please try again.';
       });
     }
   }
@@ -729,104 +1228,276 @@ class _FoodCameraCaptureWidgetState extends State<_FoodCameraCaptureWidget> {
     super.dispose();
   }
 
+  Widget _corner({required bool top, required bool left}) => SizedBox(
+    width: 36,
+    height: 36,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          top: top
+              ? const BorderSide(color: _DS.accent, width: 2.5)
+              : BorderSide.none,
+          bottom: !top
+              ? const BorderSide(color: _DS.accent, width: 2.5)
+              : BorderSide.none,
+          left: left
+              ? const BorderSide(color: _DS.accent, width: 2.5)
+              : BorderSide.none,
+          right: !left
+              ? const BorderSide(color: _DS.accent, width: 2.5)
+              : BorderSide.none,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+
+    if (_isInitializing) {
+      return const Scaffold(
+        backgroundColor: _DS.bg,
+        body: Center(child: CircularProgressIndicator(color: _DS.accent)),
+      );
+    }
+
+    if (_cameraError != null) {
+      return Scaffold(
+        backgroundColor: _DS.bg,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _DS.surfaceHigh,
+                    border: Border.all(
+                      color: _DS.danger.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: _DS.danger,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _cameraError!,
+                  textAlign: TextAlign.center,
+                  style: _DS.body(14, color: _DS.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        foregroundColor: Colors.white,
-        title: Text(
-          'Capture Food Image',
-          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-      ),
-      body: _isInitializing
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : _cameraError != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.camera_alt_outlined,
-                      color: Colors.white,
-                      size: 34,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _cameraError!,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Camera preview
+            Positioned.fill(child: CameraPreview(_controller!)),
+
+            // Vignette
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.4),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.6),
+                    ],
+                  ),
                 ),
               ),
-            )
-          : Stack(
-              children: [
-                Positioned.fill(child: CameraPreview(_controller!)),
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 22,
-                  child: Row(
+            ),
+
+            // Close button
+            Positioned(
+              left: 16,
+              top: 12,
+              child: _iconBtn(
+                icon: Icons.close_rounded,
+                onTap: () => Navigator.pop(context),
+              ),
+            ),
+
+            // Camera label
+            Positioned(
+              top: 12,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _pill(
+                  bg: Colors.black.withValues(alpha: 0.4),
+                  border: Colors.white.withValues(alpha: 0.15),
+                  child: Text(
+                    'Frame your meal',
+                    style: _DS.body(
+                      13,
+                      color: Colors.white,
+                      weight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Reticle
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 130, 32, 210),
+                  child: Stack(
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _isCapturing
-                              ? null
-                              : () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white54),
-                          ),
-                          child: Text(
-                            'Cancel',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: _corner(top: true, left: true),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _isCapturing ? null : _capturePhoto,
-                          icon: _isCapturing
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.camera_rounded),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE91E63),
-                            foregroundColor: Colors.white,
-                          ),
-                          label: Text(
-                            _isCapturing ? 'Capturing...' : 'Capture',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: _corner(top: true, left: false),
+                      ),
+                      Align(
+                        alignment: Alignment.bottomLeft,
+                        child: _corner(top: false, left: true),
+                      ),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: _corner(top: false, left: false),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
+
+            // Error banner
+            if (_cameraError != null)
+              Positioned(
+                left: 16,
+                right: 16,
+                top: 90,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _DS.danger.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(_DS.r12),
+                  ),
+                  child: Text(
+                    _cameraError!,
+                    textAlign: TextAlign.center,
+                    style: _DS.body(
+                      12,
+                      color: Colors.white,
+                      weight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+            // Bottom controls
+            Positioned(
+              left: 24,
+              right: 24,
+              bottom: 24,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Gallery icon (placeholder; wire up as needed)
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.photo_library_outlined,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+
+                  // Shutter
+                  GestureDetector(
+                    onTap: _isCapturing ? null : _capturePhoto,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(color: _DS.accent, width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _DS.accent.withValues(alpha: 0.4),
+                            blurRadius: 24,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: _isCapturing
+                          ? const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: _DS.bg,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.camera_alt_rounded,
+                              color: _DS.bg,
+                              size: 30,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+
+                  // Settings
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.flash_auto_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

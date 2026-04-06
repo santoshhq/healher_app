@@ -8,7 +8,7 @@ import '../authentication/login_pages/login_widget.dart';
 import '../authentication/services/auth_session_service.dart';
 import 'chatbot/chatbot_widget.dart';
 import 'cycle_module/cycle_module_widget.dart';
-import 'foodscanner/foodscanner-widget.dart';
+import 'nutrition_tab/nutrition_tab_widget.dart';
 import 'symtoms_predictor/predictor_widget.dart';
 import 'workouts_plans/workouts_plans_widget.dart';
 
@@ -122,6 +122,15 @@ class _HomeWidgetState extends State<HomeWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Show Nutrition Tab inline when selected
+    if (_selectedNavIndex == 3) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F0F3),
+        body: const NutritionTabWidget(),
+        bottomNavigationBar: _buildBottomNav(),
+      );
+    }
+
     return Scaffold(
       backgroundColor: pageBg,
       body: SafeArea(
@@ -204,10 +213,10 @@ class _HomeWidgetState extends State<HomeWidget> {
                   alignment: Alignment.centerLeft,
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    'Hello, $_firstName',
+                    '$_firstName',
                     style: GoogleFonts.plusJakartaSans(
                       color: Colors.white,
-                      fontSize: 29,
+                      fontSize: 25,
                       height: 1,
                       fontWeight: FontWeight.w700,
                     ),
@@ -921,12 +930,7 @@ class _HomeWidgetState extends State<HomeWidget> {
             ),
           );
         }
-        if (index == 3) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const FoodScannerWidget()),
-          );
-        }
+        // Nutrition (index 3) now shows as a tab inline - no navigation needed
       },
       child: SizedBox(
         width: 64,

@@ -100,6 +100,22 @@ class FoodScannerModel extends ChangeNotifier {
     }
   }
 
+  Future<void> setImageFromPathAndAnalyse(String imagePath) async {
+    await setImageFromPath(imagePath);
+    if (selectedImage == null) {
+      return;
+    }
+    await analyseImage();
+  }
+
+  Future<void> pickFromGalleryAndAnalyse() async {
+    await pickFromGallery();
+    if (selectedImage == null) {
+      return;
+    }
+    await analyseImage();
+  }
+
   Future<void> analyseImage() async {
     final imageData = imageBase64?.trim() ?? '';
     if (imageData.isEmpty) {
