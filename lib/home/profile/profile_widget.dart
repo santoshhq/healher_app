@@ -14,12 +14,14 @@ class ProfileWidget extends StatefulWidget {
     this.initialUserId,
     this.initialFullName,
     this.initialEmail,
+    this.showBottomNav = true,
     super.key,
   });
 
   final String? initialUserId;
   final String? initialFullName;
   final String? initialEmail;
+  final bool showBottomNav;
 
   @override
   State<ProfileWidget> createState() => _ProfileWidgetState();
@@ -152,7 +154,10 @@ class _ProfileWidgetState extends State<ProfileWidget> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => WorkoutsPlansWidget(fullName: _fullName),
+          builder: (_) => WorkoutsPlansWidget(
+            userId: _effectiveUserId,
+            fullName: _fullName,
+          ),
         ),
       );
     } else if (index == 3) {
@@ -325,11 +330,13 @@ class _ProfileWidgetState extends State<ProfileWidget> {
                 ],
               ),
             ),
-      bottomNavigationBar: BottomNavWidget(
-        selectedIndex: _selectedNavIndex,
-        onNavTap: _handleNavTap,
-        onFabPressed: _handleFabPressed,
-      ),
+      bottomNavigationBar: widget.showBottomNav
+          ? BottomNavWidget(
+              selectedIndex: _selectedNavIndex,
+              onNavTap: _handleNavTap,
+              onFabPressed: _handleFabPressed,
+            )
+          : null,
     );
   }
 

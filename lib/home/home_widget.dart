@@ -17,17 +17,23 @@ import 'symtoms_predictor/predictor_widget.dart';
 import 'workouts_plans/workouts_plans_widget.dart';
 
 class HomeWidget extends StatefulWidget {
-  const HomeWidget({required this.userId, required this.fullName, super.key});
+  const HomeWidget({
+    required this.userId,
+    required this.fullName,
+    this.initialNavIndex = 0,
+    super.key,
+  });
 
   final String userId;
   final String fullName;
+  final int initialNavIndex;
 
   @override
   State<HomeWidget> createState() => _HomeWidgetState();
 }
 
 class _HomeWidgetState extends State<HomeWidget> {
-  int _selectedNavIndex = 0;
+  late int _selectedNavIndex;
 
   final Color pageBg = const Color(0xFFF5F0F3);
   final Color brandDark = const Color(0xFF3A112D);
@@ -45,6 +51,7 @@ class _HomeWidgetState extends State<HomeWidget> {
   @override
   void initState() {
     super.initState();
+    _selectedNavIndex = widget.initialNavIndex.clamp(0, 4);
     _cycleModel = CycleModuleModel(userId: widget.userId);
     _initializeCycleData();
   }
@@ -210,41 +217,6 @@ class _HomeWidgetState extends State<HomeWidget> {
   // ── Navigation Handlers ───────────────────────────────────────
   void _handleNavTap(int index) {
     setState(() => _selectedNavIndex = index);
-    if (index == 1) {
-      // Navigate to Workout
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => WorkoutsPlansWidget(
-            fullName: widget.fullName,
-            onNavTap: (targetIndex) {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-              _handleNavTap(targetIndex);
-            },
-            onFabPressed: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-              _handleFabPressed();
-            },
-          ),
-        ),
-      );
-    } else if (index == 3) {
-      // Nutrition is handled inline - just update index
-    } else if (index == 4) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProfileWidget(
-            initialUserId: widget.userId,
-            initialFullName: widget.fullName,
-          ),
-        ),
-      );
-    }
   }
 
   void _handleFabPressed() {
@@ -261,11 +233,42 @@ class _HomeWidgetState extends State<HomeWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Show Nutrition Tab inline when selected
+    if (_selectedNavIndex == 1) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F0F3),
+        body: WorkoutsPlansWidget(
+          userId: widget.userId,
+          fullName: widget.fullName,
+          showBottomNav: false,
+        ),
+        bottomNavigationBar: BottomNavWidget(
+          selectedIndex: _selectedNavIndex,
+          onNavTap: _handleNavTap,
+          onFabPressed: _handleFabPressed,
+        ),
+      );
+    }
+
     if (_selectedNavIndex == 3) {
       return Scaffold(
         backgroundColor: const Color(0xFFF5F0F3),
         body: const NutritionTabWidget(),
+        bottomNavigationBar: BottomNavWidget(
+          selectedIndex: _selectedNavIndex,
+          onNavTap: _handleNavTap,
+          onFabPressed: _handleFabPressed,
+        ),
+      );
+    }
+
+    if (_selectedNavIndex == 4) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F0F3),
+        body: ProfileWidget(
+          initialUserId: widget.userId,
+          initialFullName: widget.fullName,
+          showBottomNav: false,
+        ),
         bottomNavigationBar: BottomNavWidget(
           selectedIndex: _selectedNavIndex,
           onNavTap: _handleNavTap,
@@ -1207,6 +1210,7 @@ class _HomeWidgetState extends State<HomeWidget> {
             context,
             MaterialPageRoute(
               builder: (_) => WorkoutsPlansWidget(
+                userId: widget.userId,
                 fullName: widget.fullName,
                 onNavTap: (targetIndex) {
                   if (Navigator.canPop(context)) {

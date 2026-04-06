@@ -19,15 +19,19 @@ class WorkoutPoseState {
 
 class WorkoutsPlansModel extends ChangeNotifier {
   WorkoutsPlansModel({
+    this.userId,
     WorkoutPlanApiService? apiService,
     AuthSessionService? authSessionService,
   }) : _apiService = apiService ?? WorkoutPlanApiService(),
        _authSessionService = authSessionService ?? AuthSessionService();
 
+  final String? userId;
+
   final WorkoutPlanApiService _apiService;
   final AuthSessionService _authSessionService;
   final Map<int, Timer> _timers = {};
   Timer? _generateUnlockTimer;
+  bool _isSavingCompletion = false;
 
   bool isGenerating = false;
   bool isLoadingToday = false;
@@ -45,6 +49,15 @@ class WorkoutsPlansModel extends ChangeNotifier {
   int get completedCount =>
       poseStates.where((state) => state.isCompleted).length;
 
+  Future<String?> _resolveUserId() async {
+    final direct = userId?.trim() ?? '';
+    if (direct.isNotEmpty) return direct;
+
+    final session = await _authSessionService.getSession();
+    final fromSession = session?.userId.trim() ?? '';
+    return fromSession.isEmpty ? null : fromSession;
+  }
+
   Future<void> loadTodayCompletedWorkout() async {
     _cancelAllTimers();
     isLoadingToday = true;
@@ -55,8 +68,8 @@ class WorkoutsPlansModel extends ChangeNotifier {
     poseStates = [];
     notifyListeners();
 
-    final session = await _authSessionService.getSession();
-    if (session == null || session.userId.trim().isEmpty) {
+    final resolvedUserId = await _resolveUserId();
+    if (resolvedUserId == null || resolvedUserId.isEmpty) {
       isLoadingToday = false;
       generateError = 'User session not found. Please login again.';
       notifyListeners();
@@ -65,7 +78,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
 
     final workoutDate = _currentIstDate();
     final todayResponse = await _apiService.getTodayCompletedWorkout(
-      userId: session.userId,
+      userId: resolvedUserId,
       workoutDate: workoutDate,
     );
 
@@ -120,8 +133,8 @@ class WorkoutsPlansModel extends ChangeNotifier {
     poseStates = [];
     notifyListeners();
 
-    final session = await _authSessionService.getSession();
-    if (session == null || session.userId.trim().isEmpty) {
+    final resolvedUserId = await _resolveUserId();
+    if (resolvedUserId == null || resolvedUserId.isEmpty) {
       isGenerating = false;
       generateError = 'User session not found. Please login again.';
       notifyListeners();
@@ -131,7 +144,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
     final workoutDate = _currentIstDate();
 
     final todayResponse = await _apiService.getTodayCompletedWorkout(
-      userId: session.userId,
+      userId: resolvedUserId,
       workoutDate: workoutDate,
     );
 
@@ -170,12 +183,6 @@ class WorkoutsPlansModel extends ChangeNotifier {
       return;
     }
 
-    final saveResponse = await _apiService.saveCompletedDailyWorkout(
-      userId: session.userId,
-      workoutDate: workoutDate,
-      poses: response.poses,
-    );
-
     poseStates = response.poses
         .map((pose) => WorkoutPoseState(pose: pose))
         .toList();
@@ -183,19 +190,57 @@ class WorkoutsPlansModel extends ChangeNotifier {
     if (poseStates.isEmpty) {
       generateError = 'No poses found for the requested plan.';
     } else {
+      // Do not auto-save as completed at generation time.
+      // Save only after user marks all poses complete from pose session.
       _setGenerateLockForWorkoutDate(
         workoutDate: workoutDate,
-        hasWorkout: saveResponse.success,
+        hasWorkout: false,
       );
       generateMessage = response.message;
-      saveMessage = saveResponse.success
-          ? (saveResponse.message.isNotEmpty
-                ? saveResponse.message
-                : 'Daily completed poses saved')
-          : null;
-      saveError = saveResponse.success ? null : saveResponse.message;
+      saveMessage = null;
+      saveError = null;
     }
     notifyListeners();
+  }
+
+  Future<void> _saveCompletedWorkoutIfReady() async {
+    if (_isSavingCompletion) return;
+    if (poseStates.isEmpty) return;
+    if (completedCount < totalCount) return;
+
+    _isSavingCompletion = true;
+    try {
+      final resolvedUserId = await _resolveUserId();
+      if (resolvedUserId == null || resolvedUserId.isEmpty) {
+        saveError = 'User session not found. Please login again.';
+        notifyListeners();
+        return;
+      }
+
+      final workoutDate = _currentIstDate();
+      final poses = poseStates.map((state) => state.pose).toList();
+      final saveResponse = await _apiService.saveCompletedDailyWorkout(
+        userId: resolvedUserId,
+        workoutDate: workoutDate,
+        poses: poses,
+      );
+
+      if (saveResponse.success) {
+        saveError = null;
+        saveMessage = saveResponse.message.isNotEmpty
+            ? saveResponse.message
+            : 'Daily completed poses saved';
+        _setGenerateLockForWorkoutDate(
+          workoutDate: workoutDate,
+          hasWorkout: true,
+        );
+      } else {
+        saveError = saveResponse.message;
+      }
+      notifyListeners();
+    } finally {
+      _isSavingCompletion = false;
+    }
   }
 
   String _currentIstDate() => _formatDate(_nowIst());
@@ -338,6 +383,9 @@ class WorkoutsPlansModel extends ChangeNotifier {
       _timers[index]?.cancel();
       _timers.remove(index);
       state.isRunning = false;
+      if (completedCount == totalCount) {
+        unawaited(_saveCompletedWorkoutIfReady());
+      }
     }
 
     notifyListeners();
@@ -378,4 +426,3 @@ class WorkoutsPlansModel extends ChangeNotifier {
     super.dispose();
   }
 }
-

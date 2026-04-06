@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'pose_session_widget.dart';
 import 'workouts_plans_model.dart';
 import '../bottom_nav_widget.dart';
-import '../nutrition_tab/nutrition_tab_widget.dart';
+import '../home_widget.dart';
 import '../profile/profile_widget.dart';
 
 class WorkoutsPlansWidget extends StatefulWidget {
   const WorkoutsPlansWidget({
+    required this.userId,
     required this.fullName,
+    this.showBottomNav = true,
     this.onNavTap,
     this.onFabPressed,
     super.key,
   });
+  final String userId;
   final String fullName;
+  final bool showBottomNav;
   final ValueChanged<int>? onNavTap;
   final VoidCallback? onFabPressed;
 
@@ -36,7 +41,7 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
   @override
   void initState() {
     super.initState();
-    _model = WorkoutsPlansModel();
+    _model = WorkoutsPlansModel(userId: widget.userId);
     _model.addListener(_onModelChanged);
     _model.loadTodayCompletedWorkout();
   }
@@ -51,6 +56,21 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
   void _onModelChanged() {
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  Future<void> _openPoseSession(int index) async {
+    if (index < 0 || index >= _model.poseStates.length) return;
+
+    final completed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PoseSessionWidget(pose: _model.poseStates[index].pose),
+      ),
+    );
+
+    if (completed == true && mounted) {
+      _model.setCompleted(index, true);
     }
   }
 
@@ -95,6 +115,11 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
               _buildGenerateButton(),
               const SizedBox(height: 20),
 
+              if (_model.poseStates.isNotEmpty) ...[
+                _buildPosePlansSection(),
+                const SizedBox(height: 20),
+              ],
+
               // ── Today's Status Section ────────────────────
               _buildTodayStatusSection(),
               const SizedBox(height: 20),
@@ -105,11 +130,13 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavWidget(
-        selectedIndex: 1, // Workout is index 1
-        onNavTap: _handleNavTap,
-        onFabPressed: _handleFabPressed,
-      ),
+      bottomNavigationBar: widget.showBottomNav
+          ? BottomNavWidget(
+              selectedIndex: _selectedNavIndex,
+              onNavTap: _handleNavTap,
+              onFabPressed: _handleFabPressed,
+            )
+          : null,
     );
   }
 
@@ -129,15 +156,24 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
         Navigator.pop(context);
       }
     } else if (index == 3) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const NutritionTabWidget()),
+        MaterialPageRoute(
+          builder: (_) => HomeWidget(
+            userId: widget.userId,
+            fullName: widget.fullName,
+            initialNavIndex: 3,
+          ),
+        ),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => ProfileWidget(initialFullName: widget.fullName),
+          builder: (_) => ProfileWidget(
+            initialUserId: widget.userId,
+            initialFullName: widget.fullName,
+          ),
         ),
       );
     }
@@ -358,6 +394,129 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
     );
   }
 
+  Widget _buildPosePlansSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Today\'s Poses',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: _textPrimary,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...List.generate(_model.poseStates.length, _buildPoseCard),
+      ],
+    );
+  }
+
+  Widget _buildPoseCard(int index) {
+    final state = _model.poseStates[index];
+    final pose = state.pose;
+    final categoryLabel = _model.categoryLabel(pose.category);
+
+    Color categoryColor;
+    switch (pose.category.toLowerCase()) {
+      case 'warmup':
+        categoryColor = const Color(0xFFFF8A65);
+        break;
+      case 'main':
+        categoryColor = const Color(0xFFE91E63);
+        break;
+      case 'relaxation':
+        categoryColor = const Color(0xFF26A69A);
+        break;
+      default:
+        categoryColor = const Color(0xFF9575CD);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: _bgCard,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _openPoseSession(index),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: categoryColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        categoryLabel,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: categoryColor,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      state.isCompleted
+                          ? Icons.check_circle_rounded
+                          : Icons.play_circle_fill_rounded,
+                      color: state.isCompleted ? Colors.green : categoryColor,
+                      size: 20,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  pose.name,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Duration: ${pose.duration} min • ${pose.difficulty.toUpperCase()}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: _textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  state.isCompleted
+                      ? 'Completed'
+                      : 'Tap to open session video, start timer, and mark complete',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: state.isCompleted ? Colors.green : _textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Today's Status Section ────────────────────────────────────
   Widget _buildTodayStatusSection() {
     final total = _model.totalCount;
@@ -500,4 +659,3 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
     );
   }
 }
-

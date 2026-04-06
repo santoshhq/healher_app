@@ -40,38 +40,42 @@ class BottomNavWidget extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _navItem(
-                  index: 0,
-                  icon: Icons.home_rounded,
-                  label: 'Home',
-                  isSelected: selectedIndex == 0,
-                  onTap: () => onNavTap(0),
-                  accentPink: accentPink,
+                Expanded(
+                  child: _navItem(
+                    icon: Icons.home_rounded,
+                    label: 'Home',
+                    isSelected: selectedIndex == 0,
+                    onTap: () => onNavTap(0),
+                    accentPink: accentPink,
+                  ),
                 ),
-                _navItem(
-                  index: 1,
-                  icon: Icons.fitness_center_rounded,
-                  label: 'Workout',
-                  isSelected: selectedIndex == 1,
-                  onTap: () => onNavTap(1),
-                  accentPink: accentPink,
+                Expanded(
+                  child: _navItem(
+                    icon: Icons.fitness_center_rounded,
+                    label: 'Workout',
+                    isSelected: selectedIndex == 1,
+                    onTap: () => onNavTap(1),
+                    accentPink: accentPink,
+                  ),
                 ),
-                const SizedBox(width: 70),
-                _navItem(
-                  index: 3,
-                  icon: Icons.favorite_border_rounded,
-                  label: 'Nutrition',
-                  isSelected: selectedIndex == 3,
-                  onTap: () => onNavTap(3),
-                  accentPink: accentPink,
+                const SizedBox(width: 76),
+                Expanded(
+                  child: _navItem(
+                    icon: Icons.restaurant_menu_rounded,
+                    label: 'Nutrition',
+                    isSelected: selectedIndex == 3,
+                    onTap: () => onNavTap(3),
+                    accentPink: accentPink,
+                  ),
                 ),
-                _navItem(
-                  index: 4,
-                  icon: Icons.person_outline_rounded,
-                  label: 'Profile',
-                  isSelected: selectedIndex == 4,
-                  onTap: () => onNavTap(4),
-                  accentPink: accentPink,
+                Expanded(
+                  child: _navItem(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Profile',
+                    isSelected: selectedIndex == 4,
+                    onTap: () => onNavTap(4),
+                    accentPink: accentPink,
+                  ),
                 ),
               ],
             ),
@@ -130,56 +134,51 @@ class BottomNavWidget extends StatelessWidget {
   }
 
   Widget _navItem({
-    required int index,
     required IconData icon,
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
     required Color accentPink,
   }) {
-    return SizedBox(
-      width: 64,
-      child: Semantics(
-        label: label,
-        button: true,
-        selected: isSelected,
+    return Semantics(
+      label: label,
+      button: true,
+      selected: isSelected,
+      onTap: onTap,
+      child: GestureDetector(
         onTap: onTap,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? accentPink.withValues(alpha: 0.12)
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  color: isSelected ? accentPink : const Color(0xFFB2A8B5),
-                  size: 22,
-                ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? accentPink.withValues(alpha: 0.12)
+                    : Colors.transparent,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? accentPink : const Color(0xFFB2A8B5),
-                  letterSpacing: -0.1,
-                ),
+              child: Icon(
+                icon,
+                color: isSelected ? accentPink : const Color(0xFFB2A8B5),
+                size: 22,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? accentPink : const Color(0xFFB2A8B5),
+                letterSpacing: -0.1,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
-
