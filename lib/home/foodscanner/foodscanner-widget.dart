@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/ui/app_theme.dart';
 
 import 'foodscanner_model.dart';
 
@@ -314,19 +315,111 @@ class _FoodScannerWidgetState extends State<FoodScannerWidget> {
     );
   }
 
+  Widget _buildHeroCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF17253C), Color(0xFF275F95), Color(0xFF367CB8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'AI Meal Intelligence',
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Capture or upload a meal to get instant nutrition and PCOS-safe suggestions.',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.92),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePanel() {
+    return Container(
+      width: double.infinity,
+      height: 230,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEAE1EF)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: _model.selectedImage == null
+          ? Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFF5F8FC),
+                          const Color(0xFFF5ECF3),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.camera_alt_outlined,
+                        size: 30,
+                        color: Color(0xFF7B7384),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No image selected',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: const Color(0xFF7B7384),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          : Image.file(
+              File(_model.selectedImage!.path),
+              fit: BoxFit.cover,
+              width: double.infinity,
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    const Color background = Color(0xFFF6F1F8);
-
     return AnimatedBuilder(
       animation: _model,
       builder: (context, _) {
         return Scaffold(
-          backgroundColor: background,
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            foregroundColor: const Color(0xFF1D1B20),
+            foregroundColor: AppTheme.brandInk,
             title: Text(
               'Food Scanner',
               style: GoogleFonts.poppins(
@@ -341,164 +434,197 @@ class _FoodScannerWidgetState extends State<FoodScannerWidget> {
               ),
             ],
           ),
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(14, 6, 14, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF1D3557), Color(0xFF457B9D)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: Text(
-                      'Capture or upload a meal photo to get AI nutrition insights, macros, and PCOS-friendly recommendations.',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withValues(alpha: 0.92),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    height: 230,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFEAE1EF)),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: _model.selectedImage == null
-                        ? Center(
-                            child: Text(
-                              'No image selected',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: const Color(0xFF7B7384),
+          body: Container(
+            decoration: AppTheme.pageBackgroundDecoration(),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeroCard(),
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 840;
+
+                        if (!isWide) {
+                          return _buildImagePanel();
+                        }
+
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(flex: 7, child: _buildImagePanel()),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 5,
+                              child: Container(
+                                height: 230,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: const Color(0xFFEAE1EF),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Scan Checklist',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    _scanTip('Keep food fully visible'),
+                                    _scanTip('Use bright lighting'),
+                                    _scanTip('Avoid motion blur'),
+                                    _scanTip('Capture top-down angle'),
+                                  ],
+                                ),
                               ),
                             ),
-                          )
-                        : Image.file(
-                            File(_model.selectedImage!.path),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _buildActionButton(
+                          label: 'Scan Camera',
+                          icon: Icons.camera_alt_rounded,
+                          onPressed: _model.isPickingImage || _model.isAnalyzing
+                              ? null
+                              : _openCameraFlow,
+                          background: const Color(0xFF0F9D85),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildActionButton(
+                          label: 'Upload Image',
+                          icon: Icons.photo_library_rounded,
+                          onPressed: _model.isPickingImage || _model.isAnalyzing
+                              ? null
+                              : _model.pickFromGallery,
+                          background: AppTheme.brandPrimary,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            _model.isAnalyzing ||
+                                _model.isPickingImage ||
+                                _model.selectedImage == null
+                            ? null
+                            : _model.analyseImage,
+                        icon: _model.isAnalyzing
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.analytics_outlined),
+                        label: Text(
+                          _model.isAnalyzing
+                              ? 'Analyzing your food...'
+                              : 'Analyze Food',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                           ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _buildActionButton(
-                        label: 'Scan Camera',
-                        icon: Icons.camera_alt_rounded,
-                        onPressed: _model.isPickingImage || _model.isAnalyzing
-                            ? null
-                            : _openCameraFlow,
-                        background: const Color(0xFF009688),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildActionButton(
-                        label: 'Upload Image',
-                        icon: Icons.photo_library_rounded,
-                        onPressed: _model.isPickingImage || _model.isAnalyzing
-                            ? null
-                            : _model.pickFromGallery,
-                        background: const Color(0xFF5E35B1),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _model.isAnalyzing ||
-                              _model.isPickingImage ||
-                              _model.selectedImage == null
-                          ? null
-                          : _model.analyseImage,
-                      icon: _model.isAnalyzing
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.analytics_outlined),
-                      label: Text(
-                        _model.isAnalyzing
-                            ? 'Analyzing your food...'
-                            : 'Analyze Food',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
                         ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        minimumSize: const Size.fromHeight(48),
-                        backgroundColor: const Color(0xFFE91E63),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          minimumSize: const Size.fromHeight(48),
+                          backgroundColor: const Color(0xFFE91E63),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  if (_model.pickError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _model.pickError!,
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: Colors.red.shade700,
-                          fontWeight: FontWeight.w600,
+                    if (_model.pickError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _model.pickError!,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  if (_model.analyzeError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _model.analyzeError!,
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: Colors.red.shade700,
-                          fontWeight: FontWeight.w600,
+                    if (_model.analyzeError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _model.analyzeError!,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  if (_model.analyzeMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _model.analyzeMessage!,
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: const Color(0xFF2E7D32),
-                          fontWeight: FontWeight.w600,
+                    if (_model.analyzeMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _model.analyzeMessage!,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: const Color(0xFF2E7D32),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  _buildResultCard(),
-                  _buildRawResponseCard(),
-                ],
+                    _buildResultCard(),
+                    _buildRawResponseCard(),
+                  ],
+                ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _scanTip(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            size: 16,
+            color: Color(0xFF356EA9),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF4D4657),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

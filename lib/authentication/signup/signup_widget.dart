@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/ui/app_theme.dart';
 import 'signup_model.dart';
 import 'signupotp_widget.dart';
 import '../login_pages/login_widget.dart';
@@ -17,21 +18,15 @@ class _SignUpWidgetState extends State<SignUpWidget> {
 
   bool _isLoading = false;
 
-  final Color primary = const Color(0xFFE91E63);
-  final Color background = const Color(0xFFFFF5F7);
-  final Color textSecondary = const Color(0xFF8A8A8A);
+  final Color primary = AppTheme.brandPrimary;
+  final Color background = AppTheme.pageBackground;
+  final Color textSecondary = AppTheme.mutedText;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [background, background.withOpacity(0.8), Colors.white],
-          ),
-        ),
+        decoration: AppTheme.pageBackgroundDecoration(),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 18),

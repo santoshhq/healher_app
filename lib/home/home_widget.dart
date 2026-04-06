@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../authentication/services/auth_session_service.dart';
+
 import '../authentication/login_pages/login_widget.dart';
+import '../authentication/services/auth_session_service.dart';
+import '../core/ui/app_theme.dart';
+import 'chatbot/chatbot_widget.dart';
 import 'cycle_module/cycle_module_widget.dart';
 import 'foodscanner/foodscanner-widget.dart';
+import 'symtoms_predictor/predictor_widget.dart';
 import 'workouts_plans/workouts_plans_widget.dart';
 
 class HomeWidget extends StatefulWidget {
@@ -19,12 +24,14 @@ class HomeWidget extends StatefulWidget {
 class _HomeWidgetState extends State<HomeWidget> {
   int _selectedNavIndex = 2;
 
+  final Color primaryPink = const Color(0xFFD94F7C);
+  final Color lightPink = const Color(0xFFFDE8EF);
+  final Color textPrimary = const Color(0xFF1A1A1A);
+  final Color textSecondary = const Color(0xFF6B6B6B);
+
   Future<void> _logout() async {
     await AuthSessionService().clearSession();
-
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(
       context,
@@ -33,59 +40,105 @@ class _HomeWidgetState extends State<HomeWidget> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _sectionTitle(String title) {
     return Text(
       title,
-      style: GoogleFonts.poppins(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: const Color(0xFF1D1B20),
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: textPrimary,
       ),
     );
   }
 
-  Widget _buildVitalCard({
+  Widget _moduleCard({
     required String title,
-    required String value,
+    required String subtitle,
     required IconData icon,
-    required Color iconColor,
+    required VoidCallback onTap,
   }) {
-    return Expanded(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: lightPink,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: primaryPink, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _kpiCard({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: lightPink,
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF97939C),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              height: 28,
-              width: 28,
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 16, color: iconColor),
-            ),
+            Icon(icon, size: 18, color: primaryPink),
             const SizedBox(height: 8),
             Text(
               value,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1D1B20),
+                color: textSecondary,
               ),
             ),
           ],
@@ -94,313 +147,184 @@ class _HomeWidgetState extends State<HomeWidget> {
     );
   }
 
-  Widget _buildRecommendationCard({
-    required Color color,
-    required Color accent,
-    required String category,
-    required String title,
-    required String subtitle,
-    required IconData leadingIcon,
-    required IconData trailingIcon,
-    VoidCallback? onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              Container(
-                height: 38,
-                width: 38,
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  leadingIcon,
-                  size: 18,
-                  color: const Color(0xFF1D1B20),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      category,
-                      style: GoogleFonts.poppins(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF6C6774),
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1D1B20),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.poppins(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF6C6774),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                height: 30,
-                width: 30,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.75),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  trailingIcon,
-                  size: 16,
-                  color: const Color(0xFF1D1B20),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    const Color primary = Color(0xFFE91E63);
-    const Color background = Color(0xFFF8F2F5);
-    const Color textSecondary = Color(0xFF827D89);
-
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // HEADER
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          height: 28,
-                          width: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(Icons.person, size: 16),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Good Morning, ${widget.fullName}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF1D1B20),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Welcome",
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.fullName,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary,
+                              ),
+                            ),
+                          ],
                         ),
                         IconButton(
-                          visualDensity: VisualDensity.compact,
                           onPressed: _logout,
-                          icon: const Icon(
-                            Icons.logout_rounded,
-                            size: 18,
-                            color: Color(0xFFE91E63),
-                          ),
+                          icon: const Icon(Icons.logout_rounded),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'How are you feeling today?',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF1D1B20),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
+                    ).animate().fadeIn(duration: 400.ms),
+
+                    const SizedBox(height: 20),
+
+                    // CYCLE CARD
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
-                      ),
+                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
+                        color: lightPink,
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            height: 112,
-                            width: 112,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                SizedBox(
-                                  height: 112,
-                                  width: 112,
-                                  child: CircularProgressIndicator(
-                                    value: 0.38,
-                                    strokeWidth: 4,
-                                    backgroundColor: const Color(0xFFF3E8EE),
-                                    valueColor:
-                                        const AlwaysStoppedAnimation<Color>(
-                                          Color(0xFFC5005A),
-                                        ),
-                                  ),
-                                ),
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'DAY',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 10,
-                                        letterSpacing: 0.6,
-                                        color: const Color(0xFF827D89),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    Text(
-                                      '12',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 38,
-                                        height: 1,
-                                        fontWeight: FontWeight.w700,
-                                        color: const Color(0xFF1D1B20),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                          Text(
+                            "Cycle status",
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "Day 12 · Ovulation",
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: primaryPink,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Ovulation phase',
-                            style: GoogleFonts.poppins(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1D1B20),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Your energy levels are peaking. Perfect time for creative tasks!',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
+                            "High energy phase. Great time for workouts and productivity.",
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
                               color: textSecondary,
                             ),
                           ),
                           const SizedBox(height: 12),
-                          SizedBox(
-                            height: 28,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => CycleModuleWidget(
-                                      userId: widget.userId,
-                                      fullName: widget.fullName,
-                                    ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CycleModuleWidget(
+                                    userId: widget.userId,
+                                    fullName: widget.fullName,
                                   ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primary,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                              ),
-                              child: Text(
-                                'Log Symptoms',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryPink,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
+                            child: const Text("Log Today"),
                           ),
                         ],
                       ),
                     ),
+
                     const SizedBox(height: 16),
-                    _buildSectionTitle('Daily Vitals'),
-                    const SizedBox(height: 8),
+
+                    // KPI
                     Row(
                       children: [
-                        _buildVitalCard(
-                          title: 'MOOD',
-                          value: 'Radiant',
-                          icon: Icons.sentiment_satisfied_alt,
-                          iconColor: const Color(0xFFFFB300),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildVitalCard(
-                          title: 'SYMPTOMS',
-                          value: 'Mild Cramps',
-                          icon: Icons.bolt,
-                          iconColor: const Color(0xFF00A572),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildVitalCard(
-                          title: 'WATER',
-                          value: '1.2L / 2L',
+                        _kpiCard(
+                          label: "Hydration",
+                          value: "1.2L / 2L",
                           icon: Icons.water_drop,
-                          iconColor: const Color(0xFFE91E63),
                         ),
                         const SizedBox(width: 8),
-                        _buildVitalCard(
-                          title: 'SLEEP',
-                          value: '7h 45m',
-                          icon: Icons.nightlight_round,
-                          iconColor: const Color(0xFF3949AB),
+                        _kpiCard(
+                          label: "Sleep",
+                          value: "7h 45m",
+                          icon: Icons.nightlight,
+                        ),
+                        const SizedBox(width: 8),
+                        _kpiCard(
+                          label: "Mood",
+                          value: "Radiant",
+                          icon: Icons.favorite,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle("Today's Recommendations"),
+
+                    const SizedBox(height: 24),
+
+                    _sectionTitle("Your Modules"),
+                    const SizedBox(height: 12),
+
+                    _moduleCard(
+                      title: 'Cycle Tracker',
+                      subtitle: 'Track daily symptoms',
+                      icon: Icons.calendar_today,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CycleModuleWidget(
+                              userId: widget.userId,
+                              fullName: widget.fullName,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
                     const SizedBox(height: 10),
-                    _buildRecommendationCard(
-                      color: const Color(0xFFD7F2EA),
-                      accent: const Color(0xFF41C8A6),
-                      category: 'FITNESS',
-                      title: 'Generate Workout Plan',
-                      subtitle: 'Warm-up + Main + Relaxation',
-                      leadingIcon: Icons.self_improvement,
-                      trailingIcon: Icons.play_arrow_rounded,
+
+                    _moduleCard(
+                      title: 'Food Scanner',
+                      subtitle: 'Analyze your meals',
+                      icon: Icons.document_scanner,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FoodScannerWidget(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    _moduleCard(
+                      title: 'Workout Planner',
+                      subtitle: 'Personal fitness plans',
+                      icon: Icons.fitness_center,
                       onTap: () {
                         Navigator.push(
                           context,
@@ -411,144 +335,59 @@ class _HomeWidgetState extends State<HomeWidget> {
                         );
                       },
                     ),
-                    _buildRecommendationCard(
-                      color: const Color(0xFFFFE7EC),
-                      accent: const Color(0xFFF7A8B8),
-                      category: 'NUTRITION',
-                      title: 'Food Scanner',
-                      subtitle: 'Scan your meal for instant nutrition analysis',
-                      leadingIcon: Icons.restaurant_menu,
-                      trailingIcon: Icons.arrow_forward_rounded,
+
+                    const SizedBox(height: 10),
+
+                    _moduleCard(
+                      title: 'AI Chatbot',
+                      subtitle: 'Live wellness guidance',
+                      icon: Icons.smart_toy_outlined,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const FoodScannerWidget(),
+                            builder: (_) => ChatbotWidget(
+                              userId: widget.userId,
+                              fullName: widget.fullName,
+                            ),
                           ),
                         );
                       },
                     ),
-                    Container(
-                      height: 120,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(22),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF15202B), Color(0xFF2A2F3A)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            right: -28,
-                            bottom: -28,
-                            child: Container(
-                              height: 120,
-                              width: 120,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.08),
-                              ),
-                            ),
+
+                    const SizedBox(height: 10),
+
+                    _moduleCard(
+                      title: 'Symptoms Predictor',
+                      subtitle: 'PCOS risk screening in slides',
+                      icon: Icons.monitor_heart_outlined,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PredictorWidget(fullName: widget.fullName),
                           ),
-                          Positioned(
-                            left: 14,
-                            top: 14,
-                            child: Icon(
-                              Icons.psychology_alt,
-                              size: 18,
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                          ),
-                          Positioned(
-                            left: 14,
-                            right: 14,
-                            bottom: 14,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Mindful Moments',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Explore techniques to reduce cortisol and improve cycle regularity through breathwork.',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w400,
-                                    color: Colors.white.withOpacity(0.85),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ],
                 ),
               ),
             ),
+
+            // BOTTOM NAV
             Container(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Color(0xFFF0E8EC))),
+                border: Border(top: BorderSide(color: Color(0xFFEAEAEA))),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildBottomNavItem(
-                    index: 0,
-                    icon: Icons.calendar_today_outlined,
-                    label: 'Tracker',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CycleModuleWidget(
-                            userId: widget.userId,
-                            fullName: widget.fullName,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildBottomNavItem(
-                    index: 1,
-                    icon: Icons.favorite_border,
-                    label: 'Health',
-                  ),
-                  _buildBottomNavItem(
-                    index: 2,
-                    icon: Icons.home_rounded,
-                    label: 'Home',
-                  ),
-                  _buildBottomNavItem(
-                    index: 3,
-                    icon: Icons.document_scanner_outlined,
-                    label: 'Scanner',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const FoodScannerWidget(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildBottomNavItem(
-                    index: 4,
-                    icon: Icons.person_outline,
-                    label: 'Profile',
-                  ),
+                  _navItem(0, Icons.calendar_today_outlined),
+                  _navItem(2, Icons.home),
+                  _navItem(3, Icons.document_scanner_outlined),
                 ],
               ),
             ),
@@ -558,53 +397,17 @@ class _HomeWidgetState extends State<HomeWidget> {
     );
   }
 
-  Widget _buildBottomNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-    VoidCallback? onTap,
-  }) {
+  Widget _navItem(int index, IconData icon) {
     final isSelected = _selectedNavIndex == index;
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _selectedNavIndex = index;
-        });
-        if (onTap != null) {
-          onTap();
-        }
+        setState(() => _selectedNavIndex = index);
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 28,
-            width: 28,
-            decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFFFFEDF4) : Colors.transparent,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: isSelected
-                  ? const Color(0xFFE91E63)
-                  : const Color(0xFF9A95A1),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-              color: isSelected
-                  ? const Color(0xFFE91E63)
-                  : const Color(0xFF9A95A1),
-            ),
-          ),
-        ],
+      child: Icon(
+        icon,
+        color: isSelected ? primaryPink : Colors.grey,
+        size: 22,
       ),
     );
   }

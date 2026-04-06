@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/ui/app_theme.dart';
 
 import 'cycle_module_model.dart';
 import 'services/cycle_api_service.dart';
@@ -723,8 +724,13 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFFCFD)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFF1E7EC)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x14000000),
@@ -746,124 +752,149 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFDE1B61), Color(0xFFF06292)],
+          colors: [Color(0xFFB71453), Color(0xFFE94882), Color(0xFFF785A8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Text(
-            'Cycle Care',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.8,
-              color: Colors.white.withOpacity(0.88),
+          Positioned(
+            right: -20,
+            top: -14,
+            child: Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.12),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            widget.fullName,
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${_model.cycleLengthController.text} d',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Cycle Length',
-                        style: GoogleFonts.poppins(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                      ),
-                    ],
-                  ),
+              Text(
+                'Cycle Care',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                  color: Colors.white.withValues(alpha: 0.88),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${_model.periodLengthController.text} d',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Period Length',
-                        style: GoogleFonts.poppins(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                      ),
-                    ],
-                  ),
+              const SizedBox(height: 4),
+              Text(
+                widget.fullName,
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${_model.cycles.length}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Saved Cycles',
-                        style: GoogleFonts.poppins(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                      ),
-                    ],
-                  ),
+              const SizedBox(height: 6),
+              Text(
+                'Track trends and symptom patterns to stay one step ahead.',
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '${_model.cycleLengthController.text} d',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'Cycle Length',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '${_model.periodLengthController.text} d',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'Period Length',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '${_model.cycles.length}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'Saved Cycles',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -874,17 +905,16 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
 
   @override
   Widget build(BuildContext context) {
-    const Color primary = Color(0xFFE91E63);
-    const Color background = Color(0xFFF7F0F4);
+    const Color primary = AppTheme.brandPrimary;
 
     return AnimatedBuilder(
       animation: _model,
       builder: (context, _) {
         return Scaffold(
-          backgroundColor: background,
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
-            foregroundColor: const Color(0xFF2A2230),
+            foregroundColor: AppTheme.brandInk,
             elevation: 0,
             centerTitle: false,
             title: Text(
@@ -892,7 +922,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
               style: GoogleFonts.poppins(
                 fontSize: 19,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF2A2230),
+                color: AppTheme.brandInk,
               ),
             ),
             actions: [
@@ -905,465 +935,468 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
               ),
             ],
           ),
-          body: Stack(
-            children: [
-              Positioned(
-                top: -120,
-                right: -90,
-                child: Container(
-                  height: 260,
-                  width: 260,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFFE91E63).withOpacity(0.08),
+          body: Container(
+            decoration: AppTheme.pageBackgroundDecoration(),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: -120,
+                  right: -90,
+                  child: Container(
+                    height: 260,
+                    width: 260,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFE91E63).withValues(alpha: 0.08),
+                    ),
                   ),
                 ),
-              ),
-              Positioned(
-                top: 140,
-                left: -70,
-                child: Container(
-                  height: 180,
-                  width: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFFF48FB1).withOpacity(0.15),
+                Positioned(
+                  top: 140,
+                  left: -70,
+                  child: Container(
+                    height: 180,
+                    width: 180,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFF48FB1).withValues(alpha: 0.15),
+                    ),
                   ),
                 ),
-              ),
-              SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildOverviewCard(),
-                      const SizedBox(height: 14),
-                      _buildSurfaceCard(
-                        children: [
-                          _buildSectionTitle(
-                            title: 'Add Cycle',
-                            subtitle:
-                                'Save your cycle start and duration details',
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildDatePickerChip(
-                                  label:
-                                      'Start ${_formatDate(_model.cycleStartDate)}',
-                                  icon: Icons.event_available_rounded,
-                                  onTap: () => _pickDate(
-                                    initialDate: _model.cycleStartDate,
-                                    onDatePicked: _model.setCycleStartDate,
+                SafeArea(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(14, 6, 14, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildOverviewCard(),
+                        const SizedBox(height: 14),
+                        _buildSurfaceCard(
+                          children: [
+                            _buildSectionTitle(
+                              title: 'Add Cycle',
+                              subtitle:
+                                  'Save your cycle start and duration details',
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildDatePickerChip(
+                                    label:
+                                        'Start ${_formatDate(_model.cycleStartDate)}',
+                                    icon: Icons.event_available_rounded,
+                                    onTap: () => _pickDate(
+                                      initialDate: _model.cycleStartDate,
+                                      onDatePicked: _model.setCycleStartDate,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildDatePickerChip(
+                                    label: _model.cycleEndDate == null
+                                        ? 'End Optional'
+                                        : 'End ${_formatDate(_model.cycleEndDate!)}',
+                                    icon: Icons.event_note_rounded,
+                                    onTap: () => _pickDate(
+                                      initialDate:
+                                          _model.cycleEndDate ??
+                                          _model.cycleStartDate,
+                                      onDatePicked: _model.setCycleEndDate,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildInput(
+                                    label: 'Cycle Length',
+                                    controller: _model.cycleLengthController,
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildInput(
+                                    label: 'Period Length',
+                                    controller: _model.periodLengthController,
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_model.addCycleError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  _model.addCycleError!,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: Colors.red.shade700,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _buildDatePickerChip(
-                                  label: _model.cycleEndDate == null
-                                      ? 'End Optional'
-                                      : 'End ${_formatDate(_model.cycleEndDate!)}',
-                                  icon: Icons.event_note_rounded,
-                                  onTap: () => _pickDate(
-                                    initialDate:
-                                        _model.cycleEndDate ??
-                                        _model.cycleStartDate,
-                                    onDatePicked: _model.setCycleEndDate,
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _model.isSubmittingCycle
+                                    ? null
+                                    : _submitCycle,
+                                icon: _model.isSubmittingCycle
+                                    ? const SizedBox(
+                                        height: 16,
+                                        width: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.check_circle_outline),
+                                label: Text(
+                                  _model.isSubmittingCycle
+                                      ? 'Saving...'
+                                      : 'Save Cycle',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  elevation: 0,
+                                  backgroundColor: primary,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size.fromHeight(48),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildInput(
-                                  label: 'Cycle Length',
-                                  controller: _model.cycleLengthController,
-                                  keyboardType: TextInputType.number,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _buildInput(
-                                  label: 'Period Length',
-                                  controller: _model.periodLengthController,
-                                  keyboardType: TextInputType.number,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_model.addCycleError != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                _model.addCycleError!,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: Colors.red.shade700,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSurfaceCard(
+                          children: [
+                            _buildSectionTitle(
+                              title: 'Daily Log',
+                              subtitle: 'Track mood, flow, and wellness habits',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildDatePickerChip(
+                              label: 'Log Date ${_formatDate(_model.logDate)}',
+                              icon: Icons.calendar_month_rounded,
+                              onTap: () => _pickDate(
+                                initialDate: _model.logDate,
+                                onDatePicked: _model.setLogDate,
                               ),
                             ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _model.isSubmittingCycle
-                                  ? null
-                                  : _submitCycle,
-                              icon: _model.isSubmittingCycle
-                                  ? const SizedBox(
-                                      height: 16,
-                                      width: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.check_circle_outline),
-                              label: Text(
-                                _model.isSubmittingCycle
-                                    ? 'Saving...'
-                                    : 'Save Cycle',
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                elevation: 0,
-                                backgroundColor: primary,
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size.fromHeight(48),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSurfaceCard(
-                        children: [
-                          _buildSectionTitle(
-                            title: 'Daily Log',
-                            subtitle: 'Track mood, flow, and wellness habits',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildDatePickerChip(
-                            label: 'Log Date ${_formatDate(_model.logDate)}',
-                            icon: Icons.calendar_month_rounded,
-                            onTap: () => _pickDate(
-                              initialDate: _model.logDate,
-                              onDatePicked: _model.setLogDate,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  value: _model.selectedFlow,
-                                  items: _flowOptions
-                                      .map(
-                                        (e) => DropdownMenuItem<String>(
-                                          value: e,
-                                          child: Text(
-                                            e.toUpperCase(),
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 12,
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _model.selectedFlow,
+                                    items: _flowOptions
+                                        .map(
+                                          (e) => DropdownMenuItem<String>(
+                                            value: e,
+                                            child: Text(
+                                              e.toUpperCase(),
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      _model.setFlow(value);
-                                    }
-                                  },
-                                  decoration: _inputDecoration(label: 'Flow'),
+                                        )
+                                        .toList(),
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        _model.setFlow(value);
+                                      }
+                                    },
+                                    decoration: _inputDecoration(label: 'Flow'),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  value: _model.selectedMood,
-                                  items: _moodOptions
-                                      .map(
-                                        (e) => DropdownMenuItem<String>(
-                                          value: e,
-                                          child: Text(
-                                            e.toUpperCase(),
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 12,
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _model.selectedMood,
+                                    items: _moodOptions
+                                        .map(
+                                          (e) => DropdownMenuItem<String>(
+                                            value: e,
+                                            child: Text(
+                                              e.toUpperCase(),
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                              ),
                                             ),
                                           ),
+                                        )
+                                        .toList(),
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        _model.setMood(value);
+                                      }
+                                    },
+                                    decoration: _inputDecoration(label: 'Mood'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _buildInput(
+                              label: 'Symptoms (comma separated)',
+                              controller: _model.symptomsController,
+                              hint: 'cramps, headache',
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildInput(
+                                    label: 'Sleep Hours',
+                                    controller: _model.sleepController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
                                         ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      _model.setMood(value);
-                                    }
-                                  },
-                                  decoration: _inputDecoration(label: 'Mood'),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          _buildInput(
-                            label: 'Symptoms (comma separated)',
-                            controller: _model.symptomsController,
-                            hint: 'cramps, headache',
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildInput(
-                                  label: 'Sleep Hours',
-                                  controller: _model.sleepController,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildInput(
+                                    label: 'Water Intake (L)',
+                                    controller: _model.waterController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _buildInput(
-                                  label: 'Water Intake (L)',
-                                  controller: _model.waterController,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF7FB),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFFF4DAE7),
-                              ),
+                              ],
                             ),
-                            child: SwitchListTile.adaptive(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              activeColor: primary,
-                              title: Text(
-                                'Exercise done today',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF4A4152),
-                                ),
-                              ),
-                              value: _model.didExercise,
-                              onChanged: _model.setExercise,
-                            ),
-                          ),
-                          if (_model.addLogError != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                _model.addLogError!,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: Colors.red.shade700,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _model.isSubmittingLog
-                                  ? null
-                                  : _submitDailyLog,
-                              icon: _model.isSubmittingLog
-                                  ? const SizedBox(
-                                      height: 16,
-                                      width: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.edit_note_rounded),
-                              label: Text(
-                                _model.isSubmittingLog
-                                    ? 'Saving...'
-                                    : 'Save Daily Log',
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                elevation: 0,
-                                backgroundColor: primary,
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size.fromHeight(48),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSurfaceCard(
-                        children: [
-                          InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: _openCycleHistoryDialog,
-                            child: Ink(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 14,
-                              ),
+                            const SizedBox(height: 8),
+                            Container(
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFF7FB),
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: const Color(0xFFF4DAE7),
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    height: 38,
-                                    width: 38,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFE3EE),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.calendar_view_month_rounded,
-                                      color: Color(0xFFE91E63),
-                                      size: 20,
-                                    ),
+                              child: SwitchListTile.adaptive(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                activeColor: primary,
+                                title: Text(
+                                  'Exercise done today',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF4A4152),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Cycle History',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: const Color(0xFF2A2230),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Tap to open fixed-size monthly timeline',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 11,
-                                            color: const Color(0xFF7A7383),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 16,
-                                    color: Color(0xFF8B8295),
-                                  ),
-                                ],
+                                ),
+                                value: _model.didExercise,
+                                onChanged: _model.setExercise,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: _openDailyLogHistoryDialog,
-                            child: Ink(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8F1FC),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFE8D9F1),
+                            if (_model.addLogError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  _model.addLogError!,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: Colors.red.shade700,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    height: 38,
-                                    width: 38,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEFE1F7),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.fact_check_rounded,
-                                      color: Color(0xFF7B1FA2),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Daily Logs History',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: const Color(0xFF2A2230),
-                                          ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _model.isSubmittingLog
+                                    ? null
+                                    : _submitDailyLog,
+                                icon: _model.isSubmittingLog
+                                    ? const SizedBox(
+                                        height: 16,
+                                        width: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Tap to view all saved daily logs',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 11,
-                                            color: const Color(0xFF7A7383),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                      )
+                                    : const Icon(Icons.edit_note_rounded),
+                                label: Text(
+                                  _model.isSubmittingLog
+                                      ? 'Saving...'
+                                      : 'Save Daily Log',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w700,
                                   ),
-                                  const Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 16,
-                                    color: Color(0xFF8B8295),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  elevation: 0,
+                                  backgroundColor: primary,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size.fromHeight(48),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSurfaceCard(
+                          children: [
+                            InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: _openCycleHistoryDialog,
+                              child: Ink(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF7FB),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFFF4DAE7),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      height: 38,
+                                      width: 38,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFE3EE),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.calendar_view_month_rounded,
+                                        color: Color(0xFFE91E63),
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Cycle History',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF2A2230),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Tap to open fixed-size monthly timeline',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 11,
+                                              color: const Color(0xFF7A7383),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 16,
+                                      color: Color(0xFF8B8295),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: _openDailyLogHistoryDialog,
+                              child: Ink(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8F1FC),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFFE8D9F1),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      height: 38,
+                                      width: 38,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFE1F7),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.fact_check_rounded,
+                                        color: Color(0xFF7B1FA2),
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Daily Logs History',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF2A2230),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Tap to view all saved daily logs',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 11,
+                                              color: const Color(0xFF7A7383),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 16,
+                                      color: Color(0xFF8B8295),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
