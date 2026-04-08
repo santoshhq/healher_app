@@ -30,13 +30,11 @@ class _NutritionDS {
   static const warning = Color(0xFFFFC66D);
 
   // Radii
-  static const r8 = 8.0;
   static const r10 = 10.0;
   static const r12 = 12.0;
   static const r14 = 14.0;
   static const r16 = 16.0;
   static const r20 = 20.0;
-  static const r28 = 28.0;
 
   static TextStyle display(double size, {Color? color, FontWeight? weight}) =>
       GoogleFonts.plusJakartaSans(
@@ -676,171 +674,6 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
     );
   }
 
-  Widget _buildCameraControls() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_model.selectedImage != null && _model.result == null) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [_NutritionDS.accentPink, Color(0xFFC54882)],
-                ),
-                borderRadius: BorderRadius.circular(_NutritionDS.r12),
-                boxShadow: [
-                  BoxShadow(
-                    color: _NutritionDS.accentPink.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: InkWell(
-                onTap: _model.isAnalyzing ? null : () {},
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      _model.isAnalyzing ? Icons.hourglass_top : Icons.check,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _model.isAnalyzing ? 'Analyzing...' : 'Analyze Meal',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: _controlButton(
-                  icon: Icons.photo_library_rounded,
-                  label: 'Gallery',
-                  onTap: _model.isAnalyzing ? null : _pickFromGalleryAndAnalyse,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _controlButton(
-                  icon: Icons.add_a_photo_rounded,
-                  label: 'Camera',
-                  onTap: _model.isAnalyzing ? null : _openCameraFlow,
-                  primary: true,
-                ),
-              ),
-            ],
-          ),
-          if (_model.analyzeError != null && _model.analyzeError!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: _NutritionDS.danger.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(_NutritionDS.r8),
-                  border: Border.all(
-                    color: _NutritionDS.danger.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.info_outline,
-                      color: _NutritionDS.danger,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _model.analyzeError!,
-                        style: _NutritionDS.body(
-                          11,
-                          color: _NutritionDS.danger,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _controlButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onTap,
-    bool primary = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: primary ? _NutritionDS.accentPink : Colors.white,
-          borderRadius: BorderRadius.circular(_NutritionDS.r12),
-          border: Border.all(
-            color: primary
-                ? _NutritionDS.accentPink
-                : _NutritionDS.textMuted.withValues(alpha: 0.2),
-            width: 1.5,
-          ),
-          boxShadow: primary
-              ? [
-                  BoxShadow(
-                    color: _NutritionDS.accentPink.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: primary ? Colors.white : _NutritionDS.accentPink,
-              size: 22,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: primary ? Colors.white : _NutritionDS.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildResultView() {
     final result = _model.result;
     if (result == null) return const SizedBox.shrink();
@@ -1109,8 +942,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                     ),
 
                     // ── Recommendation Section
-                    if (result.recommendation != null &&
-                        result.recommendation!.isNotEmpty)
+                    if (result.recommendation.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Container(
@@ -1153,7 +985,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                result.recommendation ?? '',
+                                result.recommendation,
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -1165,13 +997,11 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                           ),
                         ),
                       ),
-                    if (result.recommendation != null &&
-                        result.recommendation!.isNotEmpty)
+                    if (result.recommendation.isNotEmpty)
                       const SizedBox(height: 12),
 
                     // ── Alternative Section
-                    if (result.alternative != null &&
-                        result.alternative!.isNotEmpty)
+                    if (result.alternative.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Container(
@@ -1212,7 +1042,7 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                result.alternative ?? '',
+                                result.alternative,
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -1554,4 +1384,3 @@ class _NutritionCameraCaptureWidgetState
     );
   }
 }
-

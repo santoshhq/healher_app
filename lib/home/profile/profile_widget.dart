@@ -143,7 +143,7 @@ class _ProfileWidgetState extends State<ProfileWidget> {
     setState(() => _selectedNavIndex = index);
 
     if (index == 0) {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) =>
@@ -151,7 +151,7 @@ class _ProfileWidgetState extends State<ProfileWidget> {
         ),
       );
     } else if (index == 1) {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => WorkoutsPlansWidget(
@@ -161,7 +161,7 @@ class _ProfileWidgetState extends State<ProfileWidget> {
         ),
       );
     } else if (index == 3) {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const NutritionTabWidget()),
       );
@@ -189,6 +189,7 @@ class _ProfileWidgetState extends State<ProfileWidget> {
         title: Text(
           'Profile',
           style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
             fontWeight: FontWeight.w800,
             color: const Color(0xFF221A26),
           ),

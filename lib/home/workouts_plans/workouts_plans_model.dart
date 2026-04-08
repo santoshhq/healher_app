@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../authentication/services/auth_session_service.dart';
 import 'services/workout_plan_api_service.dart';
@@ -29,6 +31,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
 
   final WorkoutPlanApiService _apiService;
   final AuthSessionService _authSessionService;
+  static const _dailyPlanCachePrefix = 'workout_plan.daily_cache';
   final Map<int, Timer> _timers = {};
   Timer? _generateUnlockTimer;
   bool _isSavingCompletion = false;
@@ -48,6 +51,8 @@ class WorkoutsPlansModel extends ChangeNotifier {
 
   int get completedCount =>
       poseStates.where((state) => state.isCompleted).length;
+
+  String getWorkoutDate() => _currentWorkoutCycleDate();
 
   Future<String?> _resolveUserId() async {
     final direct = userId?.trim() ?? '';
@@ -76,7 +81,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
       return;
     }
 
-    final workoutDate = _currentIstDate();
+    final workoutDate = _currentWorkoutCycleDate();
     final todayResponse = await _apiService.getTodayCompletedWorkout(
       userId: resolvedUserId,
       workoutDate: workoutDate,
@@ -85,6 +90,21 @@ class WorkoutsPlansModel extends ChangeNotifier {
     isLoadingToday = false;
 
     if (!todayResponse.success) {
+      final cachedStates = await _readCachedPlan(
+        resolvedUserId: resolvedUserId,
+        workoutDate: workoutDate,
+      );
+      if (cachedStates.isNotEmpty) {
+        poseStates = cachedStates;
+        _setGenerateLockForWorkoutDate(
+          workoutDate: workoutDate,
+          hasWorkout: true,
+        );
+        generateMessage = 'Loaded your saved workout plan for today.';
+        notifyListeners();
+        return;
+      }
+
       _setGenerateLockForWorkoutDate(
         workoutDate: workoutDate,
         hasWorkout: false,
@@ -103,13 +123,29 @@ class WorkoutsPlansModel extends ChangeNotifier {
         )
         .toList();
 
+    if (poseStates.isNotEmpty) {
+      await _cacheCurrentPlan(
+        resolvedUserId: resolvedUserId,
+        workoutDate: workoutDate,
+      );
+    }
+
+    if (poseStates.isEmpty) {
+      final cachedStates = await _readCachedPlan(
+        resolvedUserId: resolvedUserId,
+        workoutDate: workoutDate,
+      );
+      if (cachedStates.isNotEmpty) {
+        poseStates = cachedStates;
+      }
+    }
+
     _setGenerateLockForWorkoutDate(
       workoutDate: workoutDate,
-      hasWorkout:
-          todayResponse.poses.isNotEmpty || todayResponse.completedCount > 0,
+      hasWorkout: poseStates.isNotEmpty || todayResponse.completedCount > 0,
     );
 
-    generateMessage = todayResponse.poses.isEmpty
+    generateMessage = poseStates.isEmpty
         ? 'No completed workout found for today.'
         : todayResponse.message;
     notifyListeners();
@@ -124,7 +160,6 @@ class WorkoutsPlansModel extends ChangeNotifier {
       return;
     }
 
-    _cancelAllTimers();
     isGenerating = true;
     generateError = null;
     generateMessage = null;
@@ -141,14 +176,18 @@ class WorkoutsPlansModel extends ChangeNotifier {
       return;
     }
 
-    final workoutDate = _currentIstDate();
-
+    final workoutDate = _currentWorkoutCycleDate();
+    // First, try fetching today's existing plan for this user.
     final todayResponse = await _apiService.getTodayCompletedWorkout(
       userId: resolvedUserId,
       workoutDate: workoutDate,
     );
 
-    if (todayResponse.success && todayResponse.hasCompletedWorkoutToday) {
+    final hasTodayPlan =
+        todayResponse.success && todayResponse.poses.isNotEmpty;
+
+    if (hasTodayPlan && todayResponse.hasCompletedWorkoutToday) {
+      _cancelAllTimers();
       poseStates = todayResponse.poses
           .map((pose) => WorkoutPoseState(pose: pose)..isCompleted = true)
           .toList();
@@ -163,43 +202,84 @@ class WorkoutsPlansModel extends ChangeNotifier {
       return;
     }
 
-    final response = await _apiService.getCustomPoses(
-      warmupCount: 1,
-      mainCount: 1,
-      relaxationCount: 1,
-    );
+    if (hasTodayPlan) {
+      _cancelAllTimers();
+      poseStates = todayResponse.poses
+          .map(
+            (pose) =>
+                WorkoutPoseState(pose: pose)..isCompleted = pose.completed,
+          )
+          .toList();
 
-    isGenerating = false;
+      await _cacheCurrentPlan(
+        resolvedUserId: resolvedUserId,
+        workoutDate: workoutDate,
+      );
 
-    if (!response.success) {
-      generateError = response.message;
+      isGenerating = false;
+
+      if (poseStates.length != 3) {
+        generateError = 'Exactly 3 yoga poses are required';
+        notifyListeners();
+        return;
+      }
+
+      _setGenerateLockForWorkoutDate(
+        workoutDate: workoutDate,
+        hasWorkout: true,
+      );
+      generateMessage = todayResponse.message;
+      saveMessage = null;
+      saveError = null;
       notifyListeners();
       return;
     }
 
-    if (response.poses.length != 3) {
+    // If today's plan is not present, create one using user + date.
+    final generatedResponse = await _apiService.getCustomPoses(
+      warmupCount: 1,
+      mainCount: 1,
+      relaxationCount: 1,
+      userId: resolvedUserId,
+      workoutDate: workoutDate,
+    );
+
+    isGenerating = false;
+
+    if (!generatedResponse.success) {
+      _setGenerateLockForWorkoutDate(
+        workoutDate: workoutDate,
+        hasWorkout: false,
+      );
+      generateError = generatedResponse.message;
+      notifyListeners();
+      return;
+    }
+
+    if (generatedResponse.poses.length != 3) {
+      _setGenerateLockForWorkoutDate(
+        workoutDate: workoutDate,
+        hasWorkout: false,
+      );
       generateError = 'Exactly 3 yoga poses are required';
       notifyListeners();
       return;
     }
 
-    poseStates = response.poses
+    _cancelAllTimers();
+    poseStates = generatedResponse.poses
         .map((pose) => WorkoutPoseState(pose: pose))
         .toList();
 
-    if (poseStates.isEmpty) {
-      generateError = 'No poses found for the requested plan.';
-    } else {
-      // Do not auto-save as completed at generation time.
-      // Save only after user marks all poses complete from pose session.
-      _setGenerateLockForWorkoutDate(
-        workoutDate: workoutDate,
-        hasWorkout: false,
-      );
-      generateMessage = response.message;
-      saveMessage = null;
-      saveError = null;
-    }
+    await _cacheCurrentPlan(
+      resolvedUserId: resolvedUserId,
+      workoutDate: workoutDate,
+    );
+
+    _setGenerateLockForWorkoutDate(workoutDate: workoutDate, hasWorkout: true);
+    generateMessage = generatedResponse.message;
+    saveMessage = null;
+    saveError = null;
     notifyListeners();
   }
 
@@ -217,7 +297,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
         return;
       }
 
-      final workoutDate = _currentIstDate();
+      final workoutDate = _currentWorkoutCycleDate();
       final poses = poseStates.map((state) => state.pose).toList();
       final saveResponse = await _apiService.saveCompletedDailyWorkout(
         userId: resolvedUserId,
@@ -243,10 +323,107 @@ class WorkoutsPlansModel extends ChangeNotifier {
     }
   }
 
-  String _currentIstDate() => _formatDate(_nowIst());
+  String _currentWorkoutCycleDate() =>
+      _formatDate(_effectiveWorkoutCycleTime());
 
   DateTime _nowIst() {
     return DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+  }
+
+  DateTime _effectiveWorkoutCycleTime() {
+    final nowIst = _nowIst();
+    // Workout day resets at 1:00 AM IST.
+    // 12:00 AM to 12:59 AM still belongs to previous workout day.
+    if (nowIst.hour < 1) {
+      return nowIst.subtract(const Duration(days: 1));
+    }
+    return nowIst;
+  }
+
+  String _dailyPlanCacheKey({
+    required String resolvedUserId,
+    required String workoutDate,
+  }) => '$_dailyPlanCachePrefix.$resolvedUserId.$workoutDate';
+
+  Future<void> _cacheCurrentPlan({
+    required String resolvedUserId,
+    required String workoutDate,
+  }) async {
+    if (poseStates.isEmpty) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final payload = poseStates
+        .map(
+          (state) => {
+            'pose': {
+              'name': state.pose.name,
+              'video_url': state.pose.videoUrl,
+              'category': state.pose.category,
+              'duration': state.pose.duration,
+              'benefits': state.pose.benefits,
+              'difficulty': state.pose.difficulty,
+              'tags': state.pose.tags,
+              'focus': state.pose.focus,
+              'completed': state.isCompleted,
+            },
+            'isCompleted': state.isCompleted,
+          },
+        )
+        .toList();
+
+    await prefs.setString(
+      _dailyPlanCacheKey(
+        resolvedUserId: resolvedUserId,
+        workoutDate: workoutDate,
+      ),
+      jsonEncode(payload),
+    );
+  }
+
+  Future<List<WorkoutPoseState>> _readCachedPlan({
+    required String resolvedUserId,
+    required String workoutDate,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(
+      _dailyPlanCacheKey(
+        resolvedUserId: resolvedUserId,
+        workoutDate: workoutDate,
+      ),
+    );
+
+    if (raw == null || raw.isEmpty) {
+      return const <WorkoutPoseState>[];
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return const <WorkoutPoseState>[];
+      }
+
+      final states = <WorkoutPoseState>[];
+      for (final item in decoded) {
+        if (item is! Map) {
+          continue;
+        }
+        final map = Map<String, dynamic>.from(item);
+        final poseJsonRaw = map['pose'];
+        if (poseJsonRaw is! Map) {
+          continue;
+        }
+        final poseJson = Map<String, dynamic>.from(poseJsonRaw);
+        final pose = WorkoutPose.fromJson(poseJson);
+        final state = WorkoutPoseState(pose: pose)
+          ..isCompleted = map['isCompleted'] == true || pose.completed;
+        states.add(state);
+      }
+      return states;
+    } catch (_) {
+      return const <WorkoutPoseState>[];
+    }
   }
 
   void _setGenerateLockForWorkoutDate({
@@ -265,7 +442,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
     if (dateParts.length != 3) {
       isGenerateLocked = true;
       generateLockMessage =
-          'Generate Workout Plan is locked for today and unlocks at 1:00 AM IST.';
+          'Generate Workout Plan is locked for this cycle and unlocks at 1:00 AM IST.';
       return;
     }
 
@@ -275,7 +452,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
     if (year == null || month == null || day == null) {
       isGenerateLocked = true;
       generateLockMessage =
-          'Generate Workout Plan is locked for today and unlocks at 1:00 AM IST.';
+          'Generate Workout Plan is locked for this cycle and unlocks at 1:00 AM IST.';
       return;
     }
 
@@ -290,7 +467,7 @@ class WorkoutsPlansModel extends ChangeNotifier {
 
     isGenerateLocked = true;
     generateLockMessage =
-        'Generate Workout Plan is locked. It will unlock at 1:00 AM IST.';
+        'You already generated a plan for this cycle. It unlocks at 1:00 AM IST.';
 
     final waitDuration = unlockAtIst.difference(nowIst);
     _generateUnlockTimer = Timer(waitDuration, () {
@@ -387,6 +564,17 @@ class WorkoutsPlansModel extends ChangeNotifier {
         unawaited(_saveCompletedWorkoutIfReady());
       }
     }
+
+    unawaited(() async {
+      final resolvedUserId = await _resolveUserId();
+      if (resolvedUserId == null || resolvedUserId.isEmpty) {
+        return;
+      }
+      await _cacheCurrentPlan(
+        resolvedUserId: resolvedUserId,
+        workoutDate: _currentWorkoutCycleDate(),
+      );
+    }());
 
     notifyListeners();
   }

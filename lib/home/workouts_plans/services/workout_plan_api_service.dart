@@ -131,12 +131,16 @@ class WorkoutPlanApiService {
     required int warmupCount,
     required int mainCount,
     required int relaxationCount,
+    required String userId,
+    required String workoutDate,
   }) async {
     final uri = Uri.parse('$_baseUrl/get-custom-poses').replace(
       queryParameters: {
         'warmup_count': warmupCount.toString(),
         'main_count': mainCount.toString(),
         'relaxation_count': relaxationCount.toString(),
+        'user_id': userId,
+        'workout_date': workoutDate,
       },
     );
 
@@ -266,7 +270,12 @@ class WorkoutPlanApiService {
       );
     }
 
-    final uri = Uri.parse('$_baseUrl/daily-workout/$userId/$workoutDate');
+    // Endpoint format: /daily-workout/{userId}/{workoutDate}
+    final safeUserId = Uri.encodeComponent(userId.trim());
+    final safeWorkoutDate = Uri.encodeComponent(workoutDate.trim());
+    final uri = Uri.parse(
+      '$_baseUrl/daily-workout/$safeUserId/$safeWorkoutDate',
+    );
 
     try {
       final response = await http.get(uri).timeout(const Duration(seconds: 20));
@@ -323,20 +332,6 @@ class WorkoutPlanApiService {
     return workouts;
   }
 
-  List<WorkoutPose> _parsePoses(dynamic posesJson) {
-    final poses = <WorkoutPose>[];
-    if (posesJson is List) {
-      for (final item in posesJson) {
-        if (item is Map<String, dynamic>) {
-          poses.add(WorkoutPose.fromJson(item));
-        } else if (item is Map) {
-          poses.add(WorkoutPose.fromJson(Map<String, dynamic>.from(item)));
-        }
-      }
-    }
-    return poses;
-  }
-
   Map<String, dynamic> _safeDecode(String body) {
     try {
       final decoded = jsonDecode(body);
@@ -391,4 +386,3 @@ class _DailyWorkoutRecord {
     );
   }
 }
-

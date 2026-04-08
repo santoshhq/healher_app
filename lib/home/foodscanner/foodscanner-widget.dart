@@ -10,7 +10,6 @@ import 'foodscanner_model.dart';
 class _DS {
   // Brand palette
   static const bg = Color(0xFF0E0E12);
-  static const surface = Color(0xFF16161C);
   static const surfaceHigh = Color(0xFF1E1E28);
   static const card = Color(0xFF1C1C24);
   static const cardBorder = Color(0xFF2A2A38);
@@ -21,7 +20,6 @@ class _DS {
 
   static const danger = Color(0xFFFF6B6B);
   static const warning = Color(0xFFFFC66D);
-  static const info = Color(0xFF6DBEFF);
 
   static const textPrimary = Color(0xFFF4F4F6);
   static const textSecondary = Color(0xFF8888A0);
@@ -33,10 +31,8 @@ class _DS {
   static const fatColor = Color(0xFFD4F26E);
 
   // Radii
-  static const r8 = 8.0;
   static const r12 = 12.0;
   static const r16 = 16.0;
-  static const r20 = 20.0;
   static const r28 = 28.0;
   static const r36 = 36.0;
 
@@ -1501,4 +1497,3 @@ class _FoodCameraCaptureWidgetState extends State<_FoodCameraCaptureWidget> {
     );
   }
 }
-

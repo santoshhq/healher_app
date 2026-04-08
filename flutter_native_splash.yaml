@@ -1,0 +1,25 @@
+flutter_native_splash:
+  # Background color - White
+  color: "#FFFFFF"
+  color_dark: "#FFFFFF"
+  
+  # Centered app icon
+  image: assets/images/healhericon.png
+  
+  # Android 12+ settings
+  android_12:
+    image: assets/images/healhericon.png
+    icon_background_color: "#FFFFFF"
+  
+  # Platform settings
+  android: true
+  ios: true
+  web: false
+  
+  # Fullscreen mode
+  fullscreen: true
+  
+  # Info plist modifications for iOS
+  info_plist_files:
+    - 'ios/Runner/Info.plist'
+

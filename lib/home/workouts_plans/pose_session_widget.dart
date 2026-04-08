@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -10,9 +11,16 @@ import '../../core/ui/app_theme.dart';
 import 'services/workout_plan_api_service.dart';
 
 class PoseSessionWidget extends StatefulWidget {
-  const PoseSessionWidget({required this.pose, super.key});
+  const PoseSessionWidget({
+    required this.pose,
+    this.userId,
+    this.workoutDate,
+    super.key,
+  });
 
   final WorkoutPose pose;
+  final String? userId;
+  final String? workoutDate;
 
   @override
   State<PoseSessionWidget> createState() => _PoseSessionWidgetState();
@@ -35,6 +43,12 @@ class _PoseSessionWidgetState extends State<PoseSessionWidget> {
   @override
   void initState() {
     super.initState();
+    // Initialize completion status from widget data
+    _isCompleted = widget.pose.completed;
+    _initializePoseSession();
+  }
+
+  void _initializePoseSession() {
     final rawUrl = widget.pose.videoUrl.trim();
     final uri = Uri.tryParse(rawUrl);
     final youtubeId = _extractYouTubeId(rawUrl);
@@ -224,6 +238,45 @@ class _PoseSessionWidgetState extends State<PoseSessionWidget> {
     });
   }
 
+  Future<void> _handleConfirmCompletion(BuildContext dialogContext) async {
+    // Close dialog and update local UI state immediately.
+    Navigator.pop(dialogContext);
+    if (!mounted) return;
+
+    setState(() {
+      _isCompleted = true;
+    });
+
+    // Sync to API in background (best-effort) and do not block navigation.
+    unawaited(_syncCompletionBestEffort());
+
+    // Return success so workout page updates progress card instantly.
+    Navigator.pop(context, true);
+  }
+
+  Future<void> _syncCompletionBestEffort() async {
+    final userId = widget.userId?.trim();
+    final workoutDate = widget.workoutDate?.trim();
+
+    if (userId == null ||
+        userId.isEmpty ||
+        workoutDate == null ||
+        workoutDate.isEmpty) {
+      return;
+    }
+
+    try {
+      final apiService = WorkoutPlanApiService();
+      await apiService.saveCompletedDailyWorkout(
+        userId: userId,
+        workoutDate: workoutDate,
+        poses: [widget.pose],
+      );
+    } catch (_) {
+      // Ignore API sync failures here to keep UI flow smooth.
+    }
+  }
+
   Color _categoryColor() {
     switch (widget.pose.category.toLowerCase()) {
       case 'warmup':
@@ -287,9 +340,9 @@ class _PoseSessionWidgetState extends State<PoseSessionWidget> {
     final categoryColor = _categoryColor();
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: AppTheme.brandInk,
         title: Text(
@@ -637,27 +690,7 @@ class _PoseSessionWidgetState extends State<PoseSessionWidget> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.tonalIcon(
-                          onPressed: () => Navigator.pop(context, true),
-                          icon: const Icon(Icons.check_rounded),
-                          label: Text(
-                            'Mark Completed & Back',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            foregroundColor: const Color(0xFF2E7D32),
-                            backgroundColor: const Color(0xFFE6F4EA),
-                            minimumSize: const Size.fromHeight(44),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
+                      _buildMarkCompletedButton(categoryColor),
                     ],
                   ),
                 ),
@@ -668,5 +701,352 @@ class _PoseSessionWidgetState extends State<PoseSessionWidget> {
       ),
     );
   }
-}
 
+  Widget _buildMarkCompletedButton(Color categoryColor) {
+    final isDisabled = _isCompleted;
+
+    if (isDisabled) {
+      // Completely frozen state - no interactivity at all
+      return SizedBox(
+        width: double.infinity,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.grey.shade300, Colors.grey.shade400],
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.lock_rounded,
+                color: Colors.white.withValues(alpha: 0.7),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Completed ✓',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withValues(alpha: 0.7),
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0);
+    }
+
+    // Active state - fully interactive
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showCompletionDialog(categoryColor),
+          borderRadius: BorderRadius.circular(12),
+          splashColor: categoryColor.withValues(alpha: 0.2),
+          highlightColor: categoryColor.withValues(alpha: 0.1),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [categoryColor, categoryColor.withValues(alpha: 0.85)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: categoryColor.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  'Mark Completed & Back',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0);
+  }
+
+  void _showCompletionDialog(Color categoryColor) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success Icon with animation
+              Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: categoryColor.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: categoryColor.withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.check_circle_rounded,
+                      size: 40,
+                      color: categoryColor,
+                    ),
+                  )
+                  .animate()
+                  .scale(
+                    begin: const Offset(0.5, 0.5),
+                    end: const Offset(1, 1),
+                    duration: 400.ms,
+                  )
+                  .fadeIn(),
+              const SizedBox(height: 20),
+
+              // Title
+              Text(
+                'Pose Completed!',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1D1B20),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+
+              // Subtitle
+              Text(
+                widget.pose.name,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: categoryColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Message
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+                ),
+                child: Text(
+                  '${widget.pose.duration} minutes of ${widget.pose.category.toLowerCase()} work completed. Great effort!',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF6F6A78),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Stats row
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: categoryColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: categoryColor.withValues(alpha: 0.15),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Duration',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF8B7F8F),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${widget.pose.duration}m',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: categoryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: categoryColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: categoryColor.withValues(alpha: 0.15),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Category',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF8B7F8F),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.pose.category
+                                .toUpperCase()
+                                .split('')
+                                .take(1)
+                                .join(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: categoryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Action Buttons
+              Row(
+                children: [
+                  // Continue Button
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(
+                          color: categoryColor.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: Text(
+                        'CONTINUE',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: categoryColor,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Confirm Button
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            categoryColor,
+                            categoryColor.withValues(alpha: 0.85),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: categoryColor.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _handleConfirmCompletion(ctx),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.check_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'CONFIRM',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: -0.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

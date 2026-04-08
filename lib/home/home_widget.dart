@@ -10,7 +10,6 @@ import 'bottom_nav_widget.dart';
 import 'chatbot/chatbot_widget.dart';
 import 'cycle_module/cycle_module_model.dart';
 import 'cycle_module/cycle_module_widget.dart';
-import 'cycle_module/services/cycle_api_service.dart';
 import 'nutrition_tab/nutrition_tab_widget.dart';
 import 'profile/profile_widget.dart';
 import 'symtoms_predictor/predictor_widget.dart';
@@ -43,7 +42,7 @@ class _HomeWidgetState extends State<HomeWidget> {
 
   late CycleModuleModel _cycleModel;
 
-  int _daysUntilOvulation = 7;
+  int _daysUntilOvulation = 0;
   double _cycleProgress = 0.72;
   String _currentPhase = 'Follicular Phase';
   bool _isLoading = true;
@@ -63,19 +62,34 @@ class _HomeWidgetState extends State<HomeWidget> {
         _updateCycleInfo();
       }
     } catch (e) {
-      // Cycle data not available, use defaults
-      if (mounted) setState(() => _isLoading = false);
+      // Cycle data not available, use safe fallback values.
+      if (mounted) {
+        _setNoCycleDefaults();
+      }
     }
+  }
+
+  void _setNoCycleDefaults() {
+    setState(() {
+      _daysUntilOvulation = 0;
+      _cycleProgress = 0.0;
+      _currentPhase = 'No Cycle Data';
+      _isLoading = false;
+    });
   }
 
   void _updateCycleInfo() {
     if (_cycleModel.cycles.isEmpty) {
-      setState(() => _isLoading = false);
+      _setNoCycleDefaults();
       return;
     }
 
     final now = _normalize(DateTime.now());
     final latest = _cycleModel.cycles.last;
+    if (latest.cycleLength <= 0 || latest.periodLength <= 0) {
+      _setNoCycleDefaults();
+      return;
+    }
 
     // Get ovulation date
     final ovulationDate = latest.ovulationDate != null
@@ -207,10 +221,15 @@ class _HomeWidgetState extends State<HomeWidget> {
     return labels[date.weekday - 1];
   }
 
+  String _weekdayNameShort(DateTime date) {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return labels[date.weekday - 1];
+  }
+
   List<DateTime> _calendarWeekDays(DateTime anchor) {
     return List.generate(
       7,
-      (index) => DateTime(anchor.year, anchor.month, anchor.day + (index - 3)),
+      (index) => DateTime(anchor.year, anchor.month, anchor.day + (3 - index)),
     );
   }
 
@@ -475,7 +494,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Today ${today.day}',
+                  _weekdayNameShort(today),
                   style: GoogleFonts.plusJakartaSans(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
@@ -1023,6 +1042,7 @@ class _HomeWidgetState extends State<HomeWidget> {
 
   Widget _buildCycleRing({double size = 220}) {
     final scale = math.max(0.82, math.min(1.0, size / 220));
+    final targetProgress = _isLoading ? 0.0 : _cycleProgress.clamp(0.0, 1.0);
 
     return SizedBox(
       width: size,
@@ -1045,9 +1065,19 @@ class _HomeWidgetState extends State<HomeWidget> {
               ],
             ),
           ),
-          CustomPaint(
-            size: Size.square(size),
-            painter: _CycleRingPainter(progress: _cycleProgress, scale: scale),
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0.0, end: targetProgress),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOutCubic,
+            builder: (context, animatedProgress, child) {
+              return CustomPaint(
+                size: Size.square(size),
+                painter: _CycleRingPainter(
+                  progress: animatedProgress,
+                  scale: scale,
+                ),
+              );
+            },
           ),
           Column(
             mainAxisSize: MainAxisSize.min,
@@ -1099,169 +1129,6 @@ class _HomeWidgetState extends State<HomeWidget> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return SizedBox(
-      height: 92,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomCenter,
-        children: [
-          Container(
-            height: 78,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, -6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _navItem(index: 0, icon: Icons.home_rounded, label: 'Home'),
-                _navItem(
-                  index: 1,
-                  icon: Icons.fitness_center_rounded,
-                  label: 'Workout',
-                ),
-                const SizedBox(width: 70),
-                _navItem(
-                  index: 3,
-                  icon: Icons.favorite_border_rounded,
-                  label: 'Nutrition',
-                ),
-                _navItem(
-                  index: 4,
-                  icon: Icons.person_outline_rounded,
-                  label: 'Profile',
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: -10,
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _selectedNavIndex = 2);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CycleModuleWidget(
-                      userId: widget.userId,
-                      fullName: widget.fullName,
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                width: 66,
-                height: 66,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [accentPink.withValues(alpha: 0.95), accentPink],
-                  ),
-                  border: Border.all(color: Colors.white, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accentPink.withValues(alpha: 0.35),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: accentPink.withValues(alpha: 0.15),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(Icons.add_rounded, color: Colors.white, size: 30),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final isSelected = _selectedNavIndex == index;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedNavIndex = index);
-        if (index == 1) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => WorkoutsPlansWidget(
-                userId: widget.userId,
-                fullName: widget.fullName,
-                onNavTap: (targetIndex) {
-                  if (Navigator.canPop(context)) {
-                    Navigator.pop(context);
-                  }
-                  _handleNavTap(targetIndex);
-                },
-                onFabPressed: () {
-                  if (Navigator.canPop(context)) {
-                    Navigator.pop(context);
-                  }
-                  _handleFabPressed();
-                },
-              ),
-            ),
-          );
-        }
-      },
-      child: SizedBox(
-        width: 64,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? accentPink.withValues(alpha: 0.12)
-                    : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? accentPink : const Color(0xFFB2A8B5),
-                size: 22,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? accentPink : const Color(0xFFB2A8B5),
-                letterSpacing: -0.1,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1333,12 +1200,6 @@ class _MeterLines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Calculate widths based on cycle phase
-    // Follicular: ~8 days, Ovulation window: ~5 days, Luteal: ~14 days
-    final follicularDays = 8;
-    final ovulationWindowDays = 5;
-    final lutealDays = 14;
-
     // Determine active line based on phase
     int activeLine = 0;
     if (phase == 'Period Phase') {
@@ -1498,5 +1359,7 @@ class _CycleRingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _CycleRingPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.scale != scale;
+  }
 }
