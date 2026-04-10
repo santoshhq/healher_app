@@ -99,3 +99,18 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/images/healhericon.png
+  android: true
+  ios: true
+  web: true
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/ic_launcher.png
+  adaptive_icon_foreground: assets/images/healhericon.png
+  adaptive_icon_background: "#1D1B20"
+  min_sdk_android: 24
+

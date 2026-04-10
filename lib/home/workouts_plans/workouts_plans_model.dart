@@ -211,18 +211,19 @@ class WorkoutsPlansModel extends ChangeNotifier {
           )
           .toList();
 
+      if (poseStates.length != 3) {
+        isGenerating = false;
+        generateError = 'Exactly 3 yoga poses are required';
+        notifyListeners();
+        return;
+      }
+
       await _cacheCurrentPlan(
         resolvedUserId: resolvedUserId,
         workoutDate: workoutDate,
       );
 
       isGenerating = false;
-
-      if (poseStates.length != 3) {
-        generateError = 'Exactly 3 yoga poses are required';
-        notifyListeners();
-        return;
-      }
 
       _setGenerateLockForWorkoutDate(
         workoutDate: workoutDate,
@@ -280,6 +281,12 @@ class WorkoutsPlansModel extends ChangeNotifier {
     generateMessage = generatedResponse.message;
     saveMessage = null;
     saveError = null;
+    notifyListeners();
+  }
+
+  void stopGeneratingWithError(String message) {
+    isGenerating = false;
+    generateError = message;
     notifyListeners();
   }
 

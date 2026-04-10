@@ -313,9 +313,8 @@ class _PredictorWidgetState extends State<PredictorWidget> {
   Widget _buildResultView() {
     final result = _result!;
     final riskColor = _riskColor(result.riskLevel);
-    final riskLevelLabel = result.riskLevel.trim().isEmpty
-        ? 'Unknown'
-        : result.riskLevel;
+    final finalRisk = result.riskLevel.trim();
+    final riskLevelLabel = finalRisk.isEmpty ? 'Unknown' : finalRisk;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),

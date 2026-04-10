@@ -450,6 +450,23 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
                         } catch (e, st) {
                           debugPrint('Failed to generate workout plan: $e');
                           debugPrintStack(stackTrace: st);
+                          final errorMessage =
+                              'Failed to generate workout plan: $e';
+                          _model.stopGeneratingWithError(errorMessage);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(errorMessage),
+                              backgroundColor: Colors.red.shade700,
+                              action: SnackBarAction(
+                                label: 'Retry',
+                                textColor: Colors.white,
+                                onPressed: () {
+                                  _model.generateWorkoutPlan();
+                                },
+                              ),
+                            ),
+                          );
                         }
                       },
                 borderRadius: BorderRadius.circular(_radiusLarge),
@@ -797,7 +814,7 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
       statusTitle = 'Keep Going!';
       statusSubtitle = 'Workout in Progress';
       statusBody =
-          '$completed of $total poses done. You\'re $completed/${total} way through!';
+          '$completed of $total poses done. You are $completed of $total poses complete.';
     }
 
     final progressPercent = hasPlan ? ((completed / total) * 100).round() : 0;

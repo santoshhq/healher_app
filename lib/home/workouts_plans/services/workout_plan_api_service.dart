@@ -134,13 +134,40 @@ class WorkoutPlanApiService {
     required String userId,
     required String workoutDate,
   }) async {
+    final safeUserId = userId.trim();
+    final safeWorkoutDate = workoutDate.trim();
+
+    if (safeUserId.isEmpty) {
+      return const WorkoutPlanResponse(
+        success: false,
+        message: 'User not found. Please login again.',
+        poses: [],
+      );
+    }
+
+    if (safeWorkoutDate.isEmpty) {
+      return const WorkoutPlanResponse(
+        success: false,
+        message: 'Workout date is required in YYYY-MM-DD format.',
+        poses: [],
+      );
+    }
+
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(safeWorkoutDate)) {
+      return const WorkoutPlanResponse(
+        success: false,
+        message: 'Workout date must be in YYYY-MM-DD format.',
+        poses: [],
+      );
+    }
+
     final uri = Uri.parse('$_baseUrl/get-custom-poses').replace(
       queryParameters: {
         'warmup_count': warmupCount.toString(),
         'main_count': mainCount.toString(),
         'relaxation_count': relaxationCount.toString(),
-        'user_id': userId,
-        'workout_date': workoutDate,
+        'user_id': safeUserId,
+        'workout_date': safeWorkoutDate,
       },
     );
 
