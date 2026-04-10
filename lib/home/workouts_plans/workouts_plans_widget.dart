@@ -144,6 +144,15 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
           ),
         ),
         centerTitle: false,
+        actions: [
+          IconButton(
+            tooltip: 'Workout Calendar',
+            onPressed: _openWorkoutCalendar,
+            icon: const Icon(Icons.calendar_month_rounded),
+            color: _textPrimary,
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(
@@ -208,28 +217,18 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
       return;
     }
 
-    if (index == 0) {
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-    } else if (index == 3) {
-      Navigator.push(
+    if (index == 1) {
+      return;
+    }
+
+    if (index == 0 || index == 3 || index == 4) {
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => HomeWidget(
             userId: widget.userId,
             fullName: widget.fullName,
-            initialNavIndex: 3,
-          ),
-        ),
-      );
-    } else if (index == 4) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProfileWidget(
-            initialUserId: widget.userId,
-            initialFullName: widget.fullName,
+            initialNavIndex: index,
           ),
         ),
       );
@@ -241,6 +240,290 @@ class _WorkoutsPlansWidgetState extends State<WorkoutsPlansWidget> {
     if (widget.onFabPressed != null) {
       widget.onFabPressed!();
     }
+  }
+
+  Future<void> _openWorkoutCalendar() async {
+    final currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
+    DateTime visibleMonth = currentMonth;
+    Future<Map<int, int>> monthFuture = _model.fetchMonthCompletionCounts(
+      year: visibleMonth.year,
+      month: visibleMonth.month,
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: _spacingBase,
+                vertical: _spacingLarge,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(_radiusLarge),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(_spacingBase),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () async {
+                            final prevMonth = DateTime(
+                              visibleMonth.year,
+                              visibleMonth.month - 1,
+                            );
+
+                            final prevData = await _model
+                                .fetchMonthCompletionCounts(
+                                  year: prevMonth.year,
+                                  month: prevMonth.month,
+                                );
+
+                            if (!context.mounted) return;
+
+                            final hasAtLeastOneCompletedDay = prevData.values
+                                .any((count) => count >= 1);
+
+                            if (!hasAtLeastOneCompletedDay) {
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'No completed workout days in that month.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
+                            setDialogState(() {
+                              visibleMonth = prevMonth;
+                              monthFuture = Future.value(prevData);
+                            });
+                          },
+                          icon: const Icon(Icons.chevron_left_rounded),
+                        ),
+                        Expanded(
+                          child: Text(
+                            _monthTitle(visibleMonth),
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: _textPrimary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed:
+                              (visibleMonth.year < currentMonth.year ||
+                                  (visibleMonth.year == currentMonth.year &&
+                                      visibleMonth.month < currentMonth.month))
+                              ? () {
+                                  final nextMonth = DateTime(
+                                    visibleMonth.year,
+                                    visibleMonth.month + 1,
+                                  );
+                                  setDialogState(() {
+                                    visibleMonth = nextMonth;
+                                    monthFuture = _model
+                                        .fetchMonthCompletionCounts(
+                                          year: visibleMonth.year,
+                                          month: visibleMonth.month,
+                                        );
+                                  });
+                                }
+                              : null,
+                          icon: Icon(
+                            Icons.chevron_right_rounded,
+                            color:
+                                (visibleMonth.year < currentMonth.year ||
+                                    (visibleMonth.year == currentMonth.year &&
+                                        visibleMonth.month <
+                                            currentMonth.month))
+                                ? _textPrimary
+                                : _textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: _spacingSmall),
+                    _buildWeekdayHeader(),
+                    const SizedBox(height: _spacingSmall),
+                    FutureBuilder<Map<int, int>>(
+                      future: monthFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 28),
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        final completionMap = snapshot.data ?? <int, int>{};
+                        return _buildMonthGrid(visibleMonth, completionMap);
+                      },
+                    ),
+                    const SizedBox(height: _spacingBase),
+                    _buildCalendarLegend(),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _monthTitle(DateTime month) {
+    const names = <String>[
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${names[month.month - 1]} ${month.year}';
+  }
+
+  Widget _buildWeekdayHeader() {
+    const labels = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return Row(
+      children: labels
+          .map(
+            (day) => Expanded(
+              child: Text(
+                day,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _textMuted,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildMonthGrid(DateTime month, Map<int, int> completionMap) {
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final firstWeekdayOffset = DateTime(month.year, month.month, 1).weekday - 1;
+    final totalCells = firstWeekdayOffset + daysInMonth;
+    final rows = (totalCells / 7).ceil();
+    final totalGridCells = rows * 7;
+
+    return Column(
+      children: List.generate(rows, (rowIndex) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            children: List.generate(7, (colIndex) {
+              final cellIndex = rowIndex * 7 + colIndex;
+              final dayNumber = cellIndex - firstWeekdayOffset + 1;
+              final isValidDay = dayNumber >= 1 && dayNumber <= daysInMonth;
+
+              if (!isValidDay || cellIndex >= totalGridCells) {
+                return const Expanded(child: SizedBox(height: 34));
+              }
+
+              final completedCount = completionMap[dayNumber] ?? 0;
+              final bgColor = _calendarDayColor(completedCount);
+              final textColor = completedCount >= 2
+                  ? Colors.white
+                  : _textPrimary;
+
+              return Expanded(
+                child: Container(
+                  height: 34,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$dayNumber',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      }),
+    );
+  }
+
+  Color _calendarDayColor(int completedCount) {
+    if (completedCount >= 3) {
+      return const Color(0xFF66BB6A);
+    }
+    if (completedCount == 2) {
+      return const Color(0xFFF57C00);
+    }
+    if (completedCount == 1) {
+      return const Color(0xFFFFCC80);
+    }
+    return const Color(0xFFE0E0E0);
+  }
+
+  Widget _buildCalendarLegend() {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 10,
+      runSpacing: 8,
+      children: [
+        _legendItem('None', const Color(0xFFE0E0E0)),
+        _legendItem('1 Pose', const Color(0xFFFFCC80)),
+        _legendItem('2 Poses', const Color(0xFFF57C00)),
+        _legendItem('All Done', const Color(0xFF66BB6A)),
+      ],
+    );
+  }
+
+  Widget _legendItem(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: _textSecondary,
+          ),
+        ),
+      ],
+    );
   }
 
   // [REMOVED: Old _buildBottomNav() and _navItem() - now using BottomNavWidget]

@@ -54,6 +54,36 @@ class WorkoutsPlansModel extends ChangeNotifier {
 
   String getWorkoutDate() => _currentWorkoutCycleDate();
 
+  Future<Map<int, int>> fetchMonthCompletionCounts({
+    required int year,
+    required int month,
+  }) async {
+    final resolvedUserId = await _resolveUserId();
+    if (resolvedUserId == null || resolvedUserId.isEmpty) {
+      return <int, int>{};
+    }
+
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final futures = List.generate(daysInMonth, (index) async {
+      final day = index + 1;
+      final date = _formatDate(DateTime(year, month, day));
+      final response = await _apiService.getTodayCompletedWorkout(
+        userId: resolvedUserId,
+        workoutDate: date,
+      );
+
+      if (!response.success) {
+        return MapEntry(day, 0);
+      }
+
+      final count = response.completedCount.clamp(0, 3);
+      return MapEntry(day, count);
+    });
+
+    final entries = await Future.wait(futures);
+    return Map<int, int>.fromEntries(entries);
+  }
+
   Future<String?> _resolveUserId() async {
     final direct = userId?.trim() ?? '';
     if (direct.isNotEmpty) return direct;

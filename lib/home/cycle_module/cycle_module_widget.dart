@@ -26,6 +26,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   DateTime? _manualCycleStart;
   int? _manualCycleLength;
   int? _manualPeriodLength;
+  bool _isMenstrualExpanded = false;
 
   final List<String> _flowOptions = ['light', 'medium', 'heavy'];
   final List<String> _moodOptions = ['low', 'normal', 'good', 'great'];
@@ -40,6 +41,9 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _model.fetchCycles();
       await _model.fetchDailyLogs();
+      await _model.fetchCurrentCycleSummary();
+      await _model.fetchMonthCalendarSummary(_calendarMonth);
+      await _model.fetchMonthlyDailyLogs(_calendarMonth);
 
       if (!mounted) {
         return;
@@ -402,7 +406,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (context, setModalState) {
             final inputDecoration = InputDecoration(
               isDense: true,
               filled: true,
@@ -520,7 +524,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                 if (value == null) {
                                   return;
                                 }
-                                setDialogState(() => selectedFlow = value);
+                                setModalState(() => selectedFlow = value);
                               },
                             ),
                           ),
@@ -548,7 +552,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                 if (value == null) {
                                   return;
                                 }
-                                setDialogState(() => selectedMood = value);
+                                setModalState(() => selectedMood = value);
                               },
                             ),
                           ),
@@ -609,7 +613,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(11),
                                 onTap: () =>
-                                    setDialogState(() => didExercise = true),
+                                    setModalState(() => didExercise = true),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 10,
@@ -638,7 +642,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(11),
                                 onTap: () =>
-                                    setDialogState(() => didExercise = false),
+                                    setModalState(() => didExercise = false),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 10,
@@ -671,8 +675,10 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () =>
-                                  Navigator.of(dialogContext).pop(false),
+                              onPressed: () {
+                                FocusScope.of(dialogContext).unfocus();
+                                Navigator.of(dialogContext).pop(false);
+                              },
                               style: OutlinedButton.styleFrom(
                                 minimumSize: const Size.fromHeight(42),
                                 side: const BorderSide(
@@ -706,6 +712,9 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                     sleep < 0 ||
                                     water == null ||
                                     water < 0) {
+                                  if (!mounted) {
+                                    return;
+                                  }
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -731,6 +740,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                 _model.setExercise(didExercise);
                                 _model.setLogDate(_calendarSelected);
 
+                                FocusScope.of(dialogContext).unfocus();
                                 Navigator.of(dialogContext).pop(true);
                               },
                               style: ElevatedButton.styleFrom(
@@ -762,6 +772,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
       },
     );
 
+    FocusManager.instance.primaryFocus?.unfocus();
     symptomsController.dispose();
     sleepController.dispose();
     waterController.dispose();
@@ -1287,100 +1298,108 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   }
 
   Future<void> _openCycleSetupDialog() async {
-    final cycleController = TextEditingController(
-      text:
-          (_manualCycleLength ??
-                  _safeInt(_model.cycleLengthController.text, 28))
-              .toString(),
-    );
-    final periodController = TextEditingController(
-      text:
-          (_manualPeriodLength ??
-                  _safeInt(_model.periodLengthController.text, 5))
-              .toString(),
-    );
+    String cycleText =
+        _manualCycleLength?.toString() ??
+        _model.cycleLengthController.text.trim();
+    String periodText =
+        _manualPeriodLength?.toString() ??
+        _model.periodLengthController.text.trim();
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: Text(
-            'Cycle Setup',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: cycleController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Cycle Length (days)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+        return StatefulBuilder(
+          builder: (context, _) {
+            return AlertDialog(
+              scrollable: true,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: periodController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Period Length (days)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+              title: Text(
+                'Cycle Setup',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final cycle = int.tryParse(cycleController.text.trim());
-                final period = int.tryParse(periodController.text.trim());
-
-                if (cycle == null ||
-                    cycle <= 0 ||
-                    period == null ||
-                    period <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Please enter valid cycle and period lengths.',
-                        style: GoogleFonts.poppins(),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    initialValue: cycleText,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Cycle Length (days)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      backgroundColor: Colors.red.shade600,
                     ),
-                  );
-                  return;
-                }
-
-                setState(() {
-                  _manualCycleLength = cycle;
-                  _manualPeriodLength = period;
-                  _manualCycleStart ??= _normalize(_calendarSelected);
-                });
-
-                _model.cycleLengthController.text = '$cycle';
-                _model.periodLengthController.text = '$period';
-
-                Navigator.of(dialogContext).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD24787),
-                foregroundColor: Colors.white,
+                    onChanged: (value) => cycleText = value,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    initialValue: periodText,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Period Length (days)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) => periodText = value,
+                  ),
+                ],
               ),
-              child: const Text('Save'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    FocusScope.of(dialogContext).unfocus();
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final cycle = int.tryParse(cycleText.trim());
+                    final period = int.tryParse(periodText.trim());
+
+                    if (cycle == null ||
+                        cycle <= 0 ||
+                        period == null ||
+                        period <= 0) {
+                      if (!mounted) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Please enter valid cycle and period lengths.',
+                            style: GoogleFonts.poppins(),
+                          ),
+                          backgroundColor: Colors.red.shade600,
+                        ),
+                      );
+                      return;
+                    }
+
+                    setState(() {
+                      _manualCycleLength = cycle;
+                      _manualPeriodLength = period;
+                      _manualCycleStart ??= _normalize(_calendarSelected);
+                    });
+
+                    _model.cycleLengthController.text = '$cycle';
+                    _model.periodLengthController.text = '$period';
+
+                    FocusScope.of(dialogContext).unfocus();
+                    Navigator.of(dialogContext).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD24787),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1396,6 +1415,10 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   }
 
   DateTime get _cycleStart {
+    final summaryStart = _model.currentCycleSummary?.currentCycleStart;
+    if (summaryStart != null) {
+      return _normalize(summaryStart);
+    }
     if (_manualCycleStart != null) {
       return _normalize(_manualCycleStart!);
     }
@@ -1404,6 +1427,10 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   }
 
   int get _cycleLength {
+    final summaryLength = _model.currentCycleSummary?.cycleLength;
+    if (summaryLength != null && summaryLength > 0) {
+      return summaryLength;
+    }
     if (_manualCycleLength != null) {
       return _manualCycleLength!;
     }
@@ -1413,6 +1440,10 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   }
 
   int get _periodLength {
+    final summaryLength = _model.currentCycleSummary?.periodLength;
+    if (summaryLength != null && summaryLength > 0) {
+      return summaryLength;
+    }
     if (_manualPeriodLength != null) {
       return _manualPeriodLength!;
     }
@@ -1422,6 +1453,10 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   }
 
   DateTime get _predictedPeriodStart {
+    final summaryDate = _model.currentCycleSummary?.predictedNextPeriod;
+    if (summaryDate != null) {
+      return _normalize(summaryDate);
+    }
     if (_manualCycleStart != null) {
       return _normalize(_cycleStart.add(Duration(days: _cycleLength)));
     }
@@ -1433,6 +1468,10 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   }
 
   DateTime get _ovulationDate {
+    final summaryDate = _model.currentCycleSummary?.ovulationDate;
+    if (summaryDate != null) {
+      return _normalize(summaryDate);
+    }
     if (_manualCycleStart != null || _manualCycleLength != null) {
       return _normalize(
         _cycleStart.add(Duration(days: (_cycleLength - 14).clamp(8, 25))),
@@ -1502,22 +1541,258 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
   }
 
   int get _daysSinceLastPeriod {
+    final summaryDays = _model.currentCycleSummary?.daysSinceLastPeriod;
+    if (summaryDays != null) {
+      return summaryDays;
+    }
     final now = _normalize(DateTime.now());
     return now.difference(_cycleStart).inDays.clamp(0, 9999);
   }
 
-  Future<void> _pickCalendarDate() async {
-    await _pickDate(
-      initialDate: _calendarSelected,
-      onDatePicked: (picked) {
-        setState(() {
-          _calendarSelected = _normalize(picked);
-          _calendarMonth = DateTime(picked.year, picked.month);
-          _manualCycleStart = _normalize(picked);
-        });
-        _model.setCycleStartDate(picked);
-      },
+  MonthCalendarDay? _backendDayFor(DateTime date) {
+    final days = _model.currentMonthCalendar?.days;
+    if (days == null || days.isEmpty) {
+      return null;
+    }
+
+    for (final day in days) {
+      if (_sameDay(day.date, date)) {
+        return day;
+      }
+    }
+
+    return null;
+  }
+
+  String _statusLabelForCalendarDay(MonthCalendarDay? day) {
+    if (day == null) return 'normal_day';
+    return day.status;
+  }
+
+  Color _statusColorForCalendarDay(MonthCalendarDay? day) {
+    switch (_statusLabelForCalendarDay(day)) {
+      case 'period_day':
+        return const Color(0xFFF6D5E3);
+      case 'predicted_period_day':
+        return const Color(0xFFFDE3C5);
+      case 'fertile_window_day':
+        return const Color(0xFFD7D6FF);
+      case 'ovulation_day':
+        return const Color(0xFFC9F0E5);
+      default:
+        return const Color(0xFFF8F8F9);
+    }
+  }
+
+  String _calendarStatusTag(MonthCalendarDay? day) {
+    switch (_statusLabelForCalendarDay(day)) {
+      case 'period_day':
+        return 'Period';
+      case 'predicted_period_day':
+        return 'Predicted';
+      case 'fertile_window_day':
+        return 'Fertile';
+      case 'ovulation_day':
+        return 'Ovulation';
+      default:
+        return 'Normal';
+    }
+  }
+
+  Widget _buildCycleSummaryCard() {
+    final summary = _model.currentCycleSummary;
+    if (summary == null) {
+      return const SizedBox.shrink();
+    }
+
+    final confidence =
+        summary.confidence?.level ??
+        (summary.confidence?.score != null
+            ? '${(summary.confidence!.score! * 100).round()}% confidence'
+            : 'Confidence unavailable');
+
+    String formatSummaryDate(DateTime? date) {
+      if (date == null) return '-';
+      return '${_calendarMonthText(date)} ${date.day}';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBF8FA),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE8DCE0), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () {
+              setState(() {
+                _isMenstrualExpanded = !_isMenstrualExpanded;
+              });
+            },
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFF9DEE9),
+                    border: Border.all(color: const Color(0xFFF2C7D8)),
+                  ),
+                  child: const Icon(
+                    Icons.auto_graph_rounded,
+                    size: 18,
+                    color: Color(0xFFD24787),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    summary.currentPhase ?? 'Cycle Summary',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF241D28),
+                    ),
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _isMenstrualExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 220),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 24,
+                    color: Color(0xFF6D6675),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimatedCrossFade(
+            crossFadeState: _isMenstrualExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 220),
+            sizeCurve: Curves.easeInOut,
+            firstChild: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    summary.phaseRule ?? confidence,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF6D6675),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _summaryChip(
+                        'Start',
+                        formatSummaryDate(summary.currentCycleStart),
+                      ),
+                      _summaryChip(
+                        'Next',
+                        formatSummaryDate(summary.predictedNextPeriod),
+                      ),
+                      _summaryChip(
+                        'Ovulation',
+                        formatSummaryDate(summary.ovulationDate),
+                      ),
+                      _summaryChip(
+                        'Fertile',
+                        '${formatSummaryDate(summary.fertileWindowStart)} - ${formatSummaryDate(summary.fertileWindowEnd)}',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Tap to view cycle details',
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF817989),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _summaryChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE9DEE4)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF7B7380),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF241D28),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickCalendarDate() async {
+    final picked = await _showStyledCalendarPicker(
+      initialDate: _calendarSelected,
+    );
+
+    if (picked == null) {
+      return;
+    }
+
+    setState(() {
+      _calendarSelected = _normalize(picked);
+      _calendarMonth = DateTime(picked.year, picked.month);
+      _manualCycleStart = _normalize(picked);
+    });
+    _model.setCycleStartDate(picked);
+    await _model.fetchMonthCalendarSummary(_calendarMonth);
+    await _model.fetchMonthlyDailyLogs(_calendarMonth);
   }
 
   @override
@@ -1589,50 +1864,72 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                     ],
                   ),
                   const SizedBox(height: 14),
+                  if (_model.currentCycleSummary != null) ...[
+                    _buildCycleSummaryCard(),
+                    const SizedBox(height: 12),
+                  ],
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECECEE),
-                      borderRadius: BorderRadius.circular(22),
+                      color: const Color(0xFFF5F3F6),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFFECE8F0),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
                     child: Column(
                       children: [
                         Row(
                           children: [
-                            InkWell(
-                              onTap: _pickCalendarDate,
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calendar_today_outlined,
-                                    size: 15,
-                                    color: Color(0xFF1F1724),
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: _pickCalendarDate,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _calendarMonthText(_calendarMonth),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF1B1520),
-                                    ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_today_outlined,
+                                        size: 18,
+                                        color: Color(0xFFD24787),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        _calendarMonthText(_calendarMonth),
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFF1F1724),
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        size: 20,
+                                        color: Color(0xFFD24787),
+                                      ),
+                                    ],
                                   ),
-                                  const Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    size: 18,
-                                    color: Color(0xFF1F1724),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
-                            const Spacer(),
                             Text(
                               '${_calendarMonth.year}',
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFF201A25),
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF6D6675),
                               ),
                             ),
                           ],
@@ -1646,16 +1943,17 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                   child: Text(
                                     d,
                                     style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF2B2630),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF8A7E8A),
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -1674,9 +1972,23 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                               date,
                               _calendarSelected,
                             );
-                            final isPeriod = _isPeriodDay(date);
-                            final isPredicted = _isPredictedPeriodDay(date);
-                            final isFertile = _isFertileWindowDay(date);
+                            final backendDay = _backendDayFor(date);
+                            final backendStatus = _statusLabelForCalendarDay(
+                              backendDay,
+                            );
+                            final isPeriod =
+                                backendStatus == 'period_day' ||
+                                (backendDay == null && _isPeriodDay(date));
+                            final isPredicted =
+                                backendStatus == 'predicted_period_day' ||
+                                (backendDay == null &&
+                                    _isPredictedPeriodDay(date));
+                            final isFertile =
+                                backendStatus == 'fertile_window_day' ||
+                                (backendDay == null &&
+                                    _isFertileWindowDay(date));
+                            final isOvulation =
+                                backendStatus == 'ovulation_day';
 
                             Color textColor;
                             if (!inMonth) {
@@ -1686,20 +1998,10 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                             }
 
                             BoxDecoration? decoration;
-                            if (isPeriod) {
-                              decoration = const BoxDecoration(
+                            if (backendDay != null || inMonth) {
+                              decoration = BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Color(0xFFF6D5E3),
-                              );
-                            } else if (isFertile) {
-                              decoration = const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFFD7D6FF),
-                              );
-                            } else if (inMonth) {
-                              decoration = const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFFF8F8F9),
+                                color: _statusColorForCalendarDay(backendDay),
                               );
                             }
 
@@ -1715,6 +2017,21 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                 width: 1.2,
                                 strokeAlign: BorderSide.strokeAlignInside,
                               );
+                            } else if (isOvulation) {
+                              border = Border.all(
+                                color: const Color(0xFF2E7D32),
+                                width: 1.2,
+                                strokeAlign: BorderSide.strokeAlignInside,
+                              );
+                            }
+
+                            String statusLabel = '';
+                            if (isPeriod && inMonth) {
+                              statusLabel = 'P';
+                            } else if (isFertile && inMonth) {
+                              statusLabel = 'F';
+                            } else if (isOvulation && inMonth) {
+                              statusLabel = 'O';
                             }
 
                             return InkWell(
@@ -1735,13 +2052,28 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                               shape: BoxShape.circle,
                                             ))
                                         .copyWith(border: border),
-                                child: Text(
-                                  '${date.day}',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: textColor,
-                                  ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      '${date.day}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    if (statusLabel.isNotEmpty)
+                                      Text(
+                                        statusLabel,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color: textColor,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             );
@@ -1751,41 +2083,85 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _legendDot(const Color(0xFFF6B9CD)),
-                      const SizedBox(width: 6),
-                      _legendLabel('Period'),
-                      const SizedBox(width: 14),
-                      _legendPredictedDot(),
-                      const SizedBox(width: 6),
-                      _legendLabel('Predicted Period'),
-                      const SizedBox(width: 14),
-                      _legendDot(const Color(0xFFC8C7FF)),
-                      const SizedBox(width: 6),
-                      _legendLabel('Fertile Window'),
-                    ],
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 0,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFBF8FA),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Wrap(
+                      spacing: 16,
+                      runSpacing: 10,
+                      children: [
+                        _buildLegendItem(
+                          const Color(0xFFF6D5E3),
+                          'P',
+                          'Period',
+                        ),
+                        _buildLegendItem(
+                          const Color(0xFFFDE3C5),
+                          'Pd',
+                          'Predicted',
+                        ),
+                        _buildLegendItem(
+                          const Color(0xFFD7D6FF),
+                          'F',
+                          'Fertile',
+                        ),
+                        _buildLegendItem(
+                          const Color(0xFFC9F0E5),
+                          'O',
+                          'Ovulation',
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFFF07AB1), Color(0xFFE85E9C)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE85E9C).withOpacity(0.25),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      'Your period is likely to start on or around ${_prettyMonthDay(_predictedPeriodStart)}.',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF2A0F1D),
-                      ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.notifications_active_rounded,
+                          size: 24,
+                          color: Color(0xFFFFFFFF),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _model.currentCycleSummary?.predictedNextPeriod ==
+                                    null
+                                ? 'Your next period is being calculated from your cycle history.'
+                                : 'Your period is likely to start on or around ${_prettyMonthDay(_predictedPeriodStart)}.',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              height: 1.3,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFFFFFFF),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -1801,67 +2177,7 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                         ),
                       ),
                     ),
-                  Text(
-                    'Last Menstrual Period',
-                    style: GoogleFonts.poppins(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF111014),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECECEE),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFFF9DEE9),
-                            border: Border.all(color: const Color(0xFFF2C7D8)),
-                          ),
-                          child: const Icon(
-                            Icons.watch_later_outlined,
-                            size: 17,
-                            color: Color(0xFFD24787),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Started ${_calendarMonthText(_cycleStart)} ${_cycleStart.day}',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF161219),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '$_daysSinceLastPeriod days ago',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF6D6674),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -1869,14 +2185,40 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                           onPressed: _model.isSubmittingCycle
                               ? null
                               : () {
+                                  final cycleLength = int.tryParse(
+                                    _model.cycleLengthController.text.trim(),
+                                  );
+                                  final periodLength = int.tryParse(
+                                    _model.periodLengthController.text.trim(),
+                                  );
+
+                                  if (cycleLength == null ||
+                                      cycleLength <= 0 ||
+                                      periodLength == null ||
+                                      periodLength <= 0) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Please tap the + icon and enter cycle length and period length first.',
+                                          style: GoogleFonts.poppins(),
+                                        ),
+                                        backgroundColor: Colors.red.shade600,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
                                   _model.setCycleStartDate(_calendarSelected);
                                   _submitCycle();
                                 },
                           style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                            side: const BorderSide(color: Color(0xFFD24787)),
+                            minimumSize: const Size.fromHeight(50),
+                            side: const BorderSide(
+                              color: Color(0xFFD24787),
+                              width: 2,
+                            ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                           child: Text(
@@ -1884,76 +2226,105 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
                                 ? 'Saving...'
                                 : 'Save Cycle Start',
                             style: GoogleFonts.poppins(
-                              fontSize: 12,
+                              fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: const Color(0xFFD24787),
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: _model.isSubmittingLog
-                              ? null
-                              : _openDailyLogDialog,
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                            backgroundColor: const Color(0xFFD24787),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFD24787).withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            _model.isSubmittingLog
-                                ? 'Saving...'
-                                : 'Save Daily Log',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                          child: ElevatedButton(
+                            onPressed: _model.isSubmittingLog
+                                ? null
+                                : _openDailyLogDialog,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(50),
+                              backgroundColor: const Color(0xFFD24787),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              _model.isSubmittingLog
+                                  ? 'Saving...'
+                                  : 'Save Daily Log',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
-                        child: TextButton.icon(
-                          onPressed: _openCycleHistoryDialog,
-                          icon: const Icon(
-                            Icons.calendar_view_month_rounded,
-                            color: Color(0xFFD24787),
-                            size: 18,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFFF5F3F6),
                           ),
-                          label: Text(
-                            'Cycle History',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF3A313F),
+                          child: TextButton.icon(
+                            onPressed: _openCycleHistoryDialog,
+                            icon: const Icon(
+                              Icons.calendar_view_month_rounded,
+                              color: Color(0xFFD24787),
+                              size: 20,
+                            ),
+                            label: Text(
+                              'Cycle History',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFFD24787),
+                                letterSpacing: 0.2,
+                              ),
                             ),
                           ),
                         ),
                       ),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: TextButton.icon(
-                          onPressed: _openDailyLogHistoryDialog,
-                          icon: const Icon(
-                            Icons.fact_check_rounded,
-                            color: Color(0xFF7B1FA2),
-                            size: 18,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFFF5F3F6),
                           ),
-                          label: Text(
-                            'Logs History',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF3A313F),
+                          child: TextButton.icon(
+                            onPressed: _openDailyLogHistoryDialog,
+                            icon: const Icon(
+                              Icons.fact_check_rounded,
+                              color: Color(0xFF7B1FA2),
+                              size: 20,
+                            ),
+                            label: Text(
+                              'Logs History',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF7B1FA2),
+                                letterSpacing: 0.2,
+                              ),
                             ),
                           ),
                         ),
@@ -1996,6 +2367,35 @@ class _CycleModuleWidgetState extends State<CycleModuleWidget> {
         fontSize: 12,
         fontWeight: FontWeight.w500,
         color: const Color(0xFF28242C),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String abbr, String label) {
+    return Tooltip(
+      message: label,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+              border: Border.all(color: color.withOpacity(0.4), width: 0.5),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF5D5560),
+            ),
+          ),
+        ],
       ),
     );
   }

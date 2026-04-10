@@ -11,12 +11,8 @@ class CycleModuleModel extends ChangeNotifier {
   final CycleApiService _apiService;
 
   final TextEditingController userIdController = TextEditingController();
-  final TextEditingController cycleLengthController = TextEditingController(
-    text: '28',
-  );
-  final TextEditingController periodLengthController = TextEditingController(
-    text: '5',
-  );
+  final TextEditingController cycleLengthController = TextEditingController();
+  final TextEditingController periodLengthController = TextEditingController();
   final TextEditingController symptomsController = TextEditingController();
   final TextEditingController sleepController = TextEditingController(
     text: '7.5',
@@ -44,6 +40,11 @@ class CycleModuleModel extends ChangeNotifier {
   String? addLogError;
   String? fetchCyclesError;
   String? fetchLogsError;
+
+  CycleSummary? currentCycleSummary;
+  CycleConfidence? predictionConfidence;
+  MonthCalendarResponse? currentMonthCalendar;
+  MonthlyDailyLogSummaryResponse? currentMonthLogs;
 
   List<CycleRecord> cycles = [];
   List<DailyLogRecord> dailyLogs = [];
@@ -112,6 +113,9 @@ class CycleModuleModel extends ChangeNotifier {
       endDate: cycleEndDate,
       cycleLength: cycleLength,
       periodLength: periodLength,
+      timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+      entryType: 'actual',
+      isConfirmed: true,
     );
 
     isSubmittingCycle = false;
@@ -119,6 +123,8 @@ class CycleModuleModel extends ChangeNotifier {
     if (response.success) {
       addCycleMessage = response.message;
       addCycleError = null;
+      currentCycleSummary = response.currentCycleSummary;
+      predictionConfidence = response.predictionConfidence;
       notifyListeners();
       return true;
     }
@@ -172,6 +178,7 @@ class CycleModuleModel extends ChangeNotifier {
       sleep: sleep,
       water: water,
       exercise: didExercise,
+      timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
     );
 
     isSubmittingLog = false;
@@ -202,12 +209,17 @@ class CycleModuleModel extends ChangeNotifier {
     fetchCyclesError = null;
     notifyListeners();
 
-    final response = await _apiService.getCyclesByUserId(userId);
+    final response = await _apiService.getCyclesByUserIdWithTimezone(
+      userId,
+      timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+    );
 
     isFetchingCycles = false;
 
     if (response.success) {
       cycles = response.cycles;
+      currentCycleSummary = response.currentCycleSummary;
+      predictionConfidence = response.predictionConfidence;
       fetchCyclesError = null;
       notifyListeners();
       return;
@@ -229,7 +241,10 @@ class CycleModuleModel extends ChangeNotifier {
     fetchLogsError = null;
     notifyListeners();
 
-    final response = await _apiService.getDailyLogsByUserId(userId);
+    final response = await _apiService.getDailyLogsByUserIdWithTimezone(
+      userId,
+      timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+    );
 
     isFetchingLogs = false;
 
@@ -242,6 +257,62 @@ class CycleModuleModel extends ChangeNotifier {
 
     fetchLogsError = response.message;
     notifyListeners();
+  }
+
+  Future<void> fetchCurrentCycleSummary() async {
+    final userId = userIdController.text.trim();
+    if (userId.isEmpty) {
+      return;
+    }
+
+    final response = await _apiService.getCurrentCycleSummary(
+      userId,
+      timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+    );
+
+    if (response.success) {
+      currentCycleSummary = response.summary;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchMonthCalendarSummary(DateTime month) async {
+    final userId = userIdController.text.trim();
+    if (userId.isEmpty) {
+      return;
+    }
+
+    final response = await _apiService.getMonthCalendarSummary(
+      userId,
+      month.year,
+      month.month,
+      timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+    );
+
+    if (response.success) {
+      currentMonthCalendar = response;
+      currentCycleSummary = response.currentCycleSummary ?? currentCycleSummary;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchMonthlyDailyLogs(DateTime month) async {
+    final userId = userIdController.text.trim();
+    if (userId.isEmpty) {
+      return;
+    }
+
+    final response = await _apiService.getDailyLogsByMonth(
+      userId,
+      month.year,
+      month.month,
+      timezoneOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes,
+    );
+
+    if (response.success) {
+      currentMonthLogs = response;
+      notifyListeners();
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -260,4 +331,3 @@ class CycleModuleModel extends ChangeNotifier {
     super.dispose();
   }
 }
-
