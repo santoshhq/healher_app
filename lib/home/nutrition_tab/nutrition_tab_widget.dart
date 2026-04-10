@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../foodscanner/foodscanner_model.dart';
+import '../foodscanner/scannedfoods/scannedfoods_page.dart';
 
 // ─── Design Tokens (Home Widget Style) ───────────────────────────────────────
 class _NutritionDS {
@@ -104,6 +105,25 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
 
   Future<void> _pickFromGalleryAndAnalyse() async {
     await _model.pickFromGalleryAndAnalyse();
+  }
+
+  Future<void> _openHistory() async {
+    final userId = await _model.resolveUserId();
+    if (!mounted) return;
+
+    if (userId == null || userId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User session not found. Please login and retry.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => ScannedFoodsPage(userId: userId)),
+    );
   }
 
   void _showLoadingDialog() {
@@ -437,20 +457,44 @@ class _NutritionTabWidgetState extends State<NutritionTabWidget>
 
                 const SizedBox(height: 20),
 
-                // Section Label
+                // Section Label with View History Button
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Start Scanning',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: _NutritionDS.textPrimary,
-                        letterSpacing: -0.3,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Start Scanning',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: _NutritionDS.textPrimary,
+                          letterSpacing: -0.3,
+                        ),
                       ),
-                    ),
+                      GestureDetector(
+                        onTap: _openHistory,
+                        child: Row(
+                          children: [
+                            Text(
+                              'View History',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _NutritionDS.accentPink,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 14,
+                              color: _NutritionDS.accentPink,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

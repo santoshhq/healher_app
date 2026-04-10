@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'foodscanner_model.dart';
+import 'scannedfoods/scannedfoods_page.dart';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 class _DS {
@@ -253,6 +254,25 @@ class _FoodScannerWidgetState extends State<FoodScannerWidget>
     );
     if (!mounted || capturedPath == null || capturedPath.trim().isEmpty) return;
     await _model.setImageFromPathAndAnalyse(capturedPath);
+  }
+
+  Future<void> _openHistory() async {
+    final userId = await _model.resolveUserId();
+    if (!mounted) return;
+
+    if (userId == null || userId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User session not found. Please login and retry.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => ScannedFoodsPage(userId: userId)),
+    );
   }
 
   @override
@@ -930,6 +950,18 @@ class _FoodScannerWidgetState extends State<FoodScannerWidget>
                 bg: const Color(0x55FFFFFF),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+          TextButton(
+            onPressed: busy ? null : _openHistory,
+            child: Text(
+              'Show History',
+              style: _DS.body(
+                14,
+                color: busy ? _DS.textMuted : Colors.white,
+                weight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),

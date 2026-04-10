@@ -2,16 +2,18 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:healherr/authentication/services/auth_session_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'services/foodscanner_api_service.dart';
 
 class FoodScannerModel extends ChangeNotifier {
-  FoodScannerModel({FoodScannerApiService? apiService})
+  FoodScannerModel({FoodScannerApiService? apiService, this.initialUserId})
     : _apiService = apiService ?? FoodScannerApiService();
 
   final FoodScannerApiService _apiService;
   final ImagePicker _picker = ImagePicker();
+  final String? initialUserId;
 
   XFile? selectedImage;
   String? imageBase64;
@@ -24,6 +26,30 @@ class FoodScannerModel extends ChangeNotifier {
   String? pickError;
   String? analyzeError;
   String? analyzeMessage;
+
+  String? _resolvedUserId;
+
+  Future<String?> resolveUserId() async {
+    final fromWidget = initialUserId?.trim() ?? '';
+    if (fromWidget.isNotEmpty) {
+      _resolvedUserId = fromWidget;
+      return _resolvedUserId;
+    }
+
+    final cached = _resolvedUserId?.trim() ?? '';
+    if (cached.isNotEmpty) {
+      return cached;
+    }
+
+    final session = await AuthSessionService().getSession();
+    final fromSession = session?.userId.trim() ?? '';
+    if (fromSession.isNotEmpty) {
+      _resolvedUserId = fromSession;
+      return _resolvedUserId;
+    }
+
+    return null;
+  }
 
   Future<void> setImageFromPath(String imagePath) async {
     isPickingImage = true;
@@ -124,12 +150,20 @@ class FoodScannerModel extends ChangeNotifier {
       return;
     }
 
+    final userId = await resolveUserId();
+    if (userId == null || userId.isEmpty) {
+      analyzeError = 'User session not found. Please login again and retry.';
+      notifyListeners();
+      return;
+    }
+
     isAnalyzing = true;
     analyzeError = null;
     analyzeMessage = null;
     notifyListeners();
 
     final response = await _apiService.analyseFood(
+      userId: userId,
       imageBase64OrDataUri: imageData,
     );
 
@@ -163,4 +197,3 @@ class FoodScannerModel extends ChangeNotifier {
     notifyListeners();
   }
 }
-

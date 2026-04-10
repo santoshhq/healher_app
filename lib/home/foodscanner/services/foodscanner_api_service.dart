@@ -58,6 +58,82 @@ class FoodAnalysisResult {
   }
 }
 
+class FoodScanHistoryItem {
+  const FoodScanHistoryItem({
+    required this.id,
+    required this.userId,
+    required this.foodName,
+    required this.calories,
+    required this.healthScore,
+    required this.protein,
+    required this.carbs,
+    required this.fats,
+    required this.pcosPositive,
+    required this.pcosNegative,
+    required this.recommendation,
+    required this.alternative,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String userId;
+  final String foodName;
+  final String calories;
+  final String healthScore;
+  final String protein;
+  final String carbs;
+  final String fats;
+  final String pcosPositive;
+  final String pcosNegative;
+  final String recommendation;
+  final String alternative;
+  final DateTime? createdAt;
+
+  factory FoodScanHistoryItem.fromJson(Map<String, dynamic> json) {
+    final macros = FoodAnalysisResult._toMap(json['macros']);
+    final pcosImpact = FoodAnalysisResult._toMap(json['pcos_impact']);
+
+    return FoodScanHistoryItem(
+      id: json['_id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      foodName: json['food_name']?.toString() ?? 'Unknown food',
+      calories: json['calories']?.toString() ?? '-',
+      healthScore: json['health_score']?.toString() ?? '-',
+      protein: macros['protein']?.toString() ?? '-',
+      carbs: macros['carbs']?.toString() ?? '-',
+      fats: macros['fats']?.toString() ?? '-',
+      pcosPositive: pcosImpact['positive']?.toString() ?? '-',
+      pcosNegative: pcosImpact['negative']?.toString() ?? '-',
+      recommendation: json['recommendation']?.toString() ?? '-',
+      alternative: json['alternative']?.toString() ?? '-',
+      createdAt: _parseDate(json['createdAt']?.toString()),
+    );
+  }
+
+  static DateTime? _parseDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    return DateTime.tryParse(raw.trim());
+  }
+}
+
+class FoodHistoryResponse {
+  const FoodHistoryResponse({
+    required this.success,
+    required this.userId,
+    required this.count,
+    required this.scans,
+    required this.message,
+    required this.rawPayload,
+  });
+
+  final bool success;
+  final String userId;
+  final int count;
+  final List<FoodScanHistoryItem> scans;
+  final String message;
+  final Map<String, dynamic> rawPayload;
+}
+
 class FoodAnalysisResponse {
   const FoodAnalysisResponse({
     required this.success,
@@ -78,8 +154,18 @@ class FoodScannerApiService {
   static const Duration _requestTimeout = Duration(seconds: 90);
 
   Future<FoodAnalysisResponse> analyseFood({
+    required String userId,
     required String imageBase64OrDataUri,
   }) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) {
+      return const FoodAnalysisResponse(
+        success: false,
+        message: 'User id is required to save scanned food analysis.',
+        rawPayload: {},
+      );
+    }
+
     final imageData = imageBase64OrDataUri.trim();
     if (imageData.isEmpty) {
       return const FoodAnalysisResponse(
@@ -92,7 +178,11 @@ class FoodScannerApiService {
     final uri = Uri.parse('$_baseUrl$_analysePath');
 
     try {
-      final response = await _postAnalyse(uri: uri, imageData: imageData);
+      final response = await _postAnalyse(
+        uri: uri,
+        userId: cleanUserId,
+        imageData: imageData,
+      );
 
       final payload = _safeDecode(response.body);
       final analysisPayload = _extractAnalysisPayload(payload);
@@ -156,6 +246,7 @@ class FoodScannerApiService {
 
   Future<http.Response> _postAnalyse({
     required Uri uri,
+    required String userId,
     required String imageData,
   }) async {
     TimeoutException? lastTimeout;
@@ -169,7 +260,7 @@ class FoodScannerApiService {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
               },
-              body: jsonEncode({'image_data': imageData}),
+              body: jsonEncode({'userId': userId, 'image_data': imageData}),
             )
             .timeout(_requestTimeout);
       } on TimeoutException catch (error) {
@@ -247,5 +338,115 @@ class FoodScannerApiService {
     }
     return payload;
   }
-}
 
+  Future<FoodHistoryResponse> getFoodHistory({
+    required String userId,
+    int limit = 50,
+  }) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) {
+      return const FoodHistoryResponse(
+        success: false,
+        userId: '',
+        count: 0,
+        scans: [],
+        message: 'User id is required to fetch scanned food history.',
+        rawPayload: {},
+      );
+    }
+
+    final safeUserId = Uri.encodeComponent(cleanUserId);
+    final safeLimit = limit < 1 ? 1 : limit;
+    final uri = Uri.parse(
+      '$_baseUrl$_analysePath/$safeUserId?limit=$safeLimit',
+    );
+
+    try {
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(_requestTimeout);
+
+      final payload = _safeDecode(response.body);
+      final success = response.statusCode >= 200 && response.statusCode < 300;
+
+      if (!success) {
+        final notFoundMessage = response.statusCode == 404
+            ? 'History endpoint not found on server (GET /food-analyse/{userId}). Please verify backend route deployment.'
+            : null;
+        return FoodHistoryResponse(
+          success: false,
+          userId: cleanUserId,
+          count: 0,
+          scans: const [],
+          message:
+              notFoundMessage ??
+              _extractMessage(payload) ??
+              'Unable to fetch scan history (status ${response.statusCode}).',
+          rawPayload: payload,
+        );
+      }
+
+      final scansRaw = payload['scans'];
+      final scans = scansRaw is List
+          ? scansRaw
+                .whereType<Map>()
+                .map(
+                  (e) => FoodScanHistoryItem.fromJson(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .toList()
+          : <FoodScanHistoryItem>[];
+
+      final count = (payload['count'] is num)
+          ? (payload['count'] as num).toInt()
+          : scans.length;
+
+      return FoodHistoryResponse(
+        success: true,
+        userId: payload['userId']?.toString() ?? cleanUserId,
+        count: count,
+        scans: scans,
+        message: 'Scanned food history loaded.',
+        rawPayload: payload,
+      );
+    } on TimeoutException {
+      return FoodHistoryResponse(
+        success: false,
+        userId: cleanUserId,
+        count: 0,
+        scans: const [],
+        message: 'History request timed out. Please retry in a moment.',
+        rawPayload: const {},
+      );
+    } on SocketException {
+      return FoodHistoryResponse(
+        success: false,
+        userId: cleanUserId,
+        count: 0,
+        scans: const [],
+        message:
+            'Network error while fetching food history. Check internet and try again.',
+        rawPayload: const {},
+      );
+    } on HttpException {
+      return FoodHistoryResponse(
+        success: false,
+        userId: cleanUserId,
+        count: 0,
+        scans: const [],
+        message: 'Server connection failed while fetching food history.',
+        rawPayload: const {},
+      );
+    } catch (error) {
+      return FoodHistoryResponse(
+        success: false,
+        userId: cleanUserId,
+        count: 0,
+        scans: const [],
+        message: 'Unable to fetch food history: ${error.toString()}',
+        rawPayload: const {},
+      );
+    }
+  }
+}
